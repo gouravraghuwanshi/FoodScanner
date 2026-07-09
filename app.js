@@ -79,7 +79,8 @@ function setDot(id, active) {
 let _nativeStream = null;
 let _nativeRaf    = null;
 let _codeHits     = {};
-const CONFIRM_HITS = 3; // same code must appear N frames in a row
+// Phones (rear cam) are high-res — need 3 hits. Laptops (front cam) are lower quality — use 2.
+const CONFIRM_HITS = /Mobi|Android/i.test(navigator.userAgent) ? 3 : 2;
 
 function startScanner() {
   if (scanning) return;
@@ -109,13 +110,23 @@ async function _startNativeScanner() {
   viewport.innerHTML = '';
   viewport.appendChild(video);
 
+  // Try rear camera first (phones); fall back to any camera (laptops)
   try {
     _nativeStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
-    video.srcObject = _nativeStream;
-    await video.play();
-  } catch (err) {
+  } catch (_) {
+    try {
+      _nativeStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch (err) {
+      showError('Camera error: ' + err.message);
+      stopScanner();
+      return;
+    }
+  }
+
+  video.srcObject = _nativeStream;
+  try { await video.play(); } catch (err) {
     showError('Camera error: ' + err.message);
     stopScanner();
     return;
@@ -152,11 +163,15 @@ async function _startNativeScanner() {
 
 // ── QuaggaJS fallback ──────────────────────────────────────────────────────
 function _startQuaggaScanner() {
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
   Quagga.init({
     inputStream: {
       type: 'LiveStream',
       target: document.getElementById('interactive'),
-      constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      constraints: {
+        facingMode: isMobile ? 'environment' : 'user',
+        width: { ideal: 1280 }, height: { ideal: 720 }
+      }
     },
     decoder: {
       readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'],
@@ -172,12 +187,13 @@ function _startQuaggaScanner() {
 }
 
 function _onQuaggaDetected(result) {
-  const code = result.codeResult.code;
-  const err  = result.codeResult.decodedCodes
+  const code   = result.codeResult.code;
+  const err    = result.codeResult.decodedCodes
     .filter(c => c.error !== undefined)
     .reduce((s, c) => s + c.error, 0);
-  // Reject low-confidence reads
-  if (err > 0.25) return;
+  // Laptops get a relaxed threshold — front cameras are lower quality than phone rear cams
+  const maxErr = /Mobi|Android/i.test(navigator.userAgent) ? 0.25 : 0.4;
+  if (err > maxErr) return;
   _codeHits[code] = (_codeHits[code] || 0) + 1;
   if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
     lastCode = code;
