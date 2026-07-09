@@ -1058,15 +1058,45 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
 
 /* Responsive overlay */
 @media (max-width: 900px) {
-  #ro-header { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
+  #ro-header {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0.8rem;
+    padding: 0.9rem 1.2rem;
+  }
+  /* Row 1: product info + grade */
+  #ro-product-info { grid-column: 1; grid-row: 1; }
+  #ro-grade        { grid-column: 2; grid-row: 1; }
+  /* Row 2: verdict + actions side by side */
+  #ro-verdict-block { grid-column: 1; grid-row: 2; text-align: left; }
+  #ro-actions       { grid-column: 2; grid-row: 2; flex-direction: row; gap: 0.4rem; }
+
   .tab-grid-2 { grid-template-columns: 1fr; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   #ro-details-grid { grid-template-columns: 1fr; }
   #ro-body { padding: 1rem; }
 }
+
 @media (max-width: 520px) {
-  #ro-header { padding: 0.8rem 1rem; gap: 0.8rem; }
-  #ro-tabs .tab-btn { padding: 0.6rem 0.8rem; font-size: 0.65rem; }
+  #ro-header {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    padding: 0.75rem 1rem;
+    gap: 0.6rem;
+  }
+  /* Row 1: img + name stack, grade badge */
+  #ro-product-info { grid-column: 1; grid-row: 1; min-width: 0; }
+  #ro-grade        { grid-column: 2; grid-row: 1; width: 44px; height: 44px; font-size: 1.4rem; }
+  /* Row 2: verdict full width */
+  #ro-verdict-block { grid-column: 1 / -1; grid-row: 2; text-align: left; }
+  /* Row 3: action buttons full width */
+  #ro-actions { grid-column: 1 / -1; grid-row: 3; flex-direction: row; gap: 0.4rem; }
+  #ro-actions button { flex: 1; font-size: 0.65rem; padding: 0.5rem 0.5rem; }
+
+  #ro-name { font-size: 0.85rem; white-space: normal; }
+  #ro-img  { width: 48px; height: 48px; }
+
+  #ro-tabs .tab-btn { padding: 0.6rem 0.7rem; font-size: 0.6rem; letter-spacing: 1px; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   #ro-breakdown { grid-template-columns: 1fr; }
   #ro-good-col { border-right: none; border-bottom: 2px solid var(--ink); }
