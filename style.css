@@ -87,6 +87,217 @@ main {
   min-width: 0;
 }
 
+/* ── Desktop Home Redesign (min-width: 900px) ── */
+@media (min-width: 900px) {
+  .page-grid {
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+
+  main {
+    border-right: none;
+    padding: 0;
+  }
+
+  /* Hero: scanner centred in a full-width band */
+  #scanner-section {
+    display: grid;
+    grid-template-columns: 1fr 480px 1fr;
+    grid-template-rows: auto auto auto;
+    column-gap: 0;
+    background: var(--surface);
+    border-bottom: var(--border);
+  }
+
+  /* Left decorative column */
+  #scanner-section::before {
+    content: '';
+    grid-column: 1;
+    grid-row: 1 / 4;
+    border-right: var(--border);
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 18px,
+      rgba(28,28,28,0.04) 18px,
+      rgba(28,28,28,0.04) 19px
+    );
+  }
+
+  /* Right decorative column */
+  #scanner-section::after {
+    content: '';
+    grid-column: 3;
+    grid-row: 1 / 4;
+    border-left: var(--border);
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 18px,
+      rgba(28,28,28,0.04) 18px,
+      rgba(28,28,28,0.04) 19px
+    );
+  }
+
+  #scanner-box {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 2.5rem 0 0;
+    max-height: 360px;
+    aspect-ratio: 4/3;
+    border-left: var(--border);
+    border-right: var(--border);
+    box-shadow: none;
+  }
+
+  .btn-row {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 1rem;
+    padding: 0 0;
+  }
+
+  #manual-row {
+    grid-column: 2;
+    grid-row: 3;
+    margin-top: 0.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  /* How-it-works strip */
+  #how-it-works {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: var(--border);
+    max-width: 100%;
+  }
+
+  .hiw-step {
+    padding: 1.8rem 2rem;
+    border-right: var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .hiw-step:last-child { border-right: none; }
+
+  .hiw-num {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 2.8rem;
+    font-weight: 900;
+    color: rgba(28,28,28,0.08);
+    line-height: 1;
+    margin-bottom: 0.2rem;
+  }
+
+  .hiw-title {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--ink);
+  }
+
+  .hiw-desc {
+    font-family: 'Georgia', serif;
+    font-size: 0.82rem;
+    color: var(--ink-light);
+    line-height: 1.6;
+  }
+
+  /* Quotes strip — horizontal scrolling row */
+  #quotes-panel {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    display: block;
+    border-bottom: var(--border);
+  }
+
+  .aside-label {
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    padding: 0.9rem 2rem 0.7rem;
+    border-bottom: var(--border);
+    border-right: none;
+  }
+
+  .quotes-scroll {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-top: none;
+  }
+
+  .quote-card {
+    border: none;
+    border-right: var(--border);
+    box-shadow: none;
+    padding: 1.2rem 1.5rem;
+    background: var(--surface);
+  }
+
+  .quote-card:last-child { border-right: none; }
+
+  .quote-card p {
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+
+  .quote-card cite {
+    font-size: 0.62rem;
+    margin-top: 0.6rem;
+  }
+
+  /* Grade guide — horizontal strip */
+  .grade-guide-strip {
+    display: flex;
+    border-top: var(--border);
+    background: var(--bg);
+  }
+
+  .grade-guide-strip .aside-label {
+    border-bottom: none;
+    border-right: var(--border);
+    padding: 0.9rem 1.5rem;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .grade-guide-strip .grade-guide {
+    display: flex;
+    flex: 1;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .grade-guide-strip .gg-row {
+    flex: 1;
+    border-right: var(--border);
+    border-bottom: none;
+    padding: 0.7rem 1rem;
+    justify-content: flex-start;
+  }
+
+  .grade-guide-strip .gg-row:last-child { border-right: none; }
+
+  /* Hide the old stacked aside labels/grade guide inside quotes-panel */
+  #quotes-panel > .aside-label:last-of-type,
+  #quotes-panel > .grade-guide { display: none; }
+
+  /* Loading / error stay in the centred column */
+  #loading, #error-box {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* ── Scanner Box ── */
 #scanner-box {
   position: relative;
@@ -845,24 +1056,37 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
 /* ── Utility ── */
 .hidden { display: none !important; }
 
+/* Desktop-only elements: hidden by default, shown via min-width media query */
+#how-it-works    { display: none; }
+.grade-guide-strip { display: none; }
+.quotes-scroll   { display: none; }
+
+/* Mobile-only elements: shown by default, hidden on desktop */
+.mobile-only { display: block; }
+
+@media (min-width: 900px) {
+  #how-it-works      { display: grid; }
+  .grade-guide-strip { display: flex; }
+  .quotes-scroll     { display: grid; }
+  .mobile-only       { display: none; }
+}
+
 @keyframes fadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes shake   { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut{ from { opacity: 1; } to { opacity: 0; } }
 
-/* ── Responsive: tablet ── */
-@media (max-width: 900px) {
+/* ── Responsive: tablet & mobile ── */
+@media (max-width: 899px) {
   .page-grid {
     grid-template-columns: 1fr;
   }
-
   main {
     border-right: none;
     border-bottom: var(--border);
     padding: 1.4rem;
   }
-
   #quotes-panel {
     position: static;
     max-height: none;
@@ -872,13 +1096,10 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
     gap: 1rem;
     border-bottom: var(--border);
   }
-
-  /* aside-label spans full width on tablet grid */
   .aside-label { grid-column: 1 / -1; }
   .grade-guide { grid-column: 1 / -1; }
 }
 
-/* ── Responsive: mobile ── */
 @media (max-width: 520px) {
   .header-inner { flex-direction: column; gap: 0.3rem; padding: 1rem; }
   main { padding: 1rem; }

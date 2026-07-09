@@ -39,6 +39,25 @@
         </div>
       </section>
 
+      <!-- Desktop: How it works strip -->
+      <div id="how-it-works">
+        <div class="hiw-step">
+          <div class="hiw-num">01</div>
+          <div class="hiw-title">Point your camera</div>
+          <div class="hiw-desc">Hold any packaged food barcode up to your camera. Works with EAN-13, UPC-A, and more.</div>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">02</div>
+          <div class="hiw-title">Instant lookup</div>
+          <div class="hiw-desc">We query Open Food Facts and your optional API keys for the richest nutritional data available.</div>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">03</div>
+          <div class="hiw-title">Know what you eat</div>
+          <div class="hiw-desc">Get a full breakdown — grade, macros, additives, allergens, eco-score, and a plain-English verdict.</div>
+        </div>
+      </div>
+
       <div id="loading" class="hidden">
         <div class="spinner"></div>
         <p>Fetching product data...</p>
@@ -52,12 +71,21 @@
 
     <aside id="quotes-panel">
       <div class="aside-label">On Food &amp; Health</div>
-      <div class="quote-card"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
-      <div class="quote-card"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
-      <div class="quote-card"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
-      <div class="quote-card"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
-      <div class="quote-card"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
-      <div class="quote-card"><p>"Those who have no time for healthy eating will sooner or later have to find time for illness."</p><cite>Edward Stanley</cite></div>
+      <!-- Desktop: horizontal scroll row -->
+      <div class="quotes-scroll">
+        <div class="quote-card"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
+        <div class="quote-card"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
+        <div class="quote-card"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
+        <div class="quote-card"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
+        <div class="quote-card"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
+        <div class="quote-card"><p>"Those who have no time for healthy eating will sooner or later have to find time for illness."</p><cite>Edward Stanley</cite></div>
+      </div>
+      <!-- Mobile: stacked cards (same cards, shown via CSS) -->
+      <div class="quote-card mobile-only"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
+      <div class="quote-card mobile-only"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
+      <div class="quote-card mobile-only"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
+      <div class="quote-card mobile-only"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
+      <div class="quote-card mobile-only"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
       <div class="aside-label" style="margin-top:1.5rem">How to Read Grades</div>
       <div class="grade-guide">
         <div class="gg-row"><span class="gg-badge A">A</span><span>Excellent — eat freely</span></div>
@@ -67,6 +95,19 @@
         <div class="gg-row"><span class="gg-badge E">E</span><span>Avoid — very poor profile</span></div>
       </div>
     </aside>
+
+    <!-- Desktop: grade guide as horizontal strip -->
+    <div class="grade-guide-strip">
+      <div class="aside-label">How to Read Grades</div>
+      <div class="grade-guide">
+        <div class="gg-row"><span class="gg-badge A">A</span><span>Excellent — eat freely</span></div>
+        <div class="gg-row"><span class="gg-badge B">B</span><span>Good — solid everyday choice</span></div>
+        <div class="gg-row"><span class="gg-badge C">C</span><span>Moderate — watch portions</span></div>
+        <div class="gg-row"><span class="gg-badge D">D</span><span>Poor — limit consumption</span></div>
+        <div class="gg-row"><span class="gg-badge E">E</span><span>Avoid — very poor profile</span></div>
+      </div>
+    </div>
+
   </div>
 
   <footer>
