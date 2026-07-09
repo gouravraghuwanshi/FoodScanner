@@ -606,20 +606,25 @@ function switchTab(name) {
 function drawMacroDonut(n) {
   const canvas = document.getElementById('chart-macro');
   if (!canvas) return;
-  const protein = parseFloat(n['proteins_100g'])      || 0;
-  const fat     = parseFloat(n['fat_100g'])            || 0;
-  const carbs   = parseFloat(n['carbohydrates_100g'])  || 0;
+
+  const protein = parseFloat(n['proteins_100g'])     || 0;
+  const fat     = parseFloat(n['fat_100g'])           || 0;
+  const carbs   = parseFloat(n['carbohydrates_100g']) || 0;
   const total   = protein + fat + carbs;
 
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width  = canvas.offsetWidth  * dpr || 200 * dpr;
-  canvas.height = canvas.offsetWidth  * dpr || 200 * dpr;
-  canvas.style.height = canvas.style.width = (canvas.offsetWidth || 200) + 'px';
+  const dpr  = window.devicePixelRatio || 1;
+  const size = canvas.parentElement.clientWidth || 260;
+  canvas.width  = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
 
   const ctx = canvas.getContext('2d');
-  const cx  = canvas.width / 2, cy = canvas.height / 2;
-  const r   = Math.min(cx, cy) * 0.78;
-  const ir  = r * 0.55;
+  ctx.scale(dpr, dpr);
+  const cx = size / 2, cy = size / 2;
+  const r  = size * 0.38;
+  const ir = r * 0.58;
+  const gap = 0.03; // radians gap between segments
 
   const segments = [
     { label: 'Protein', val: protein, color: '#6b7f8f' },
@@ -630,27 +635,32 @@ function drawMacroDonut(n) {
 
   const sum = segments.reduce((a, s) => a + s.val, 0);
   let angle = -Math.PI / 2;
+
   segments.forEach(s => {
-    const sweep = (s.val / sum) * 2 * Math.PI;
+    const sweep = (s.val / sum) * 2 * Math.PI - gap;
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, angle, angle + sweep);
+    ctx.arc(cx, cy, r,  angle + gap / 2, angle + gap / 2 + sweep);
+    ctx.arc(cx, cy, ir, angle + gap / 2 + sweep, angle + gap / 2, true);
     ctx.closePath();
     ctx.fillStyle = s.color;
     ctx.fill();
-    angle += sweep;
+    angle += sweep + gap;
   });
 
-  // Donut hole
-  ctx.beginPath();
-  ctx.arc(cx, cy, ir, 0, 2 * Math.PI);
-  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#faf8f5';
-  ctx.fill();
+  // Centre label
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = '#6b6560';
+  ctx.font         = `bold ${Math.round(size * 0.07)}px Arial`;
+  ctx.fillText('MACROS', cx, cy - size * 0.05);
+  ctx.fillStyle = '#1c1c1c';
+  ctx.font      = `900 ${Math.round(size * 0.11)}px Arial Black, Arial`;
+  ctx.fillText(total > 0 ? Math.round(total) + 'g' : '—', cx, cy + size * 0.06);
 
   // Legend
   const legend = document.getElementById('chart-macro-legend');
   legend.innerHTML = segments.map(s =>
-    `<span class="legend-item"><span class="legend-dot" style="background:${s.color}"></span>${s.label}: ${total ? ((s.val/sum)*100).toFixed(0) : 0}%</span>`
+    `<span class="legend-item"><span class="legend-dot" style="background:${s.color}"></span>${s.label} ${total ? ((s.val / sum) * 100).toFixed(0) : 0}%</span>`
   ).join('');
 }
 
