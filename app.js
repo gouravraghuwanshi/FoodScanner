@@ -91,7 +91,10 @@ function startScanner() {
   document.getElementById('stopBtn').disabled  = false;
   document.getElementById('scanner-hint').textContent = 'Align barcode inside the box';
 
-  if (typeof BarcodeDetector !== 'undefined') {
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  // On desktop/laptop: BarcodeDetector struggles with front cameras — use Quagga which
+  // has better tolerance for low-res feeds. On mobile: prefer native BarcodeDetector.
+  if (isMobile && typeof BarcodeDetector !== 'undefined') {
     _startNativeScanner();
   } else {
     _startQuaggaScanner();
