@@ -76,49 +76,132 @@ function setDot(id, active) {
 }
 
 // ── Scanner ────────────────────────────────────────────────────────────────
+let _nativeStream = null;
+let _nativeRaf    = null;
+let _codeHits     = {};
+const CONFIRM_HITS = 3; // same code must appear N frames in a row
+
 function startScanner() {
   if (scanning) return;
   scanning = true;
   lastCode = null;
+  _codeHits = {};
   document.getElementById('startBtn').disabled = true;
   document.getElementById('stopBtn').disabled  = false;
+  document.getElementById('scanner-hint').textContent = 'Align barcode inside the box';
 
+  if (typeof BarcodeDetector !== 'undefined') {
+    _startNativeScanner();
+  } else {
+    _startQuaggaScanner();
+  }
+}
+
+// ── Native BarcodeDetector (Chrome 83+, Edge, Android Chrome) ──────────────
+async function _startNativeScanner() {
+  const video = document.createElement('video');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('autoplay', '');
+  video.muted = true;
+  video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+
+  const viewport = document.getElementById('interactive');
+  viewport.innerHTML = '';
+  viewport.appendChild(video);
+
+  try {
+    _nativeStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = _nativeStream;
+    await video.play();
+  } catch (err) {
+    showError('Camera error: ' + err.message);
+    stopScanner();
+    return;
+  }
+
+  const detector = new BarcodeDetector({
+    formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']
+  });
+
+  const tick = async () => {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length > 0) {
+          const code = codes[0].rawValue;
+          _codeHits[code] = (_codeHits[code] || 0) + 1;
+          if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
+            lastCode = code;
+            stopScanner();
+            const box = document.getElementById('scanner-box');
+            box.classList.add('scan-success');
+            setTimeout(() => box.classList.remove('scan-success'), 700);
+            lookupBarcode(code);
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    _nativeRaf = requestAnimationFrame(tick);
+  };
+  _nativeRaf = requestAnimationFrame(tick);
+}
+
+// ── QuaggaJS fallback ──────────────────────────────────────────────────────
+function _startQuaggaScanner() {
   Quagga.init({
     inputStream: {
       type: 'LiveStream',
       target: document.getElementById('interactive'),
-      constraints: { facingMode: 'environment', width: 640, height: 480 }
+      constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     },
     decoder: {
-      readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader']
+      readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'],
+      multiple: false
     },
-    locate: true
+    locate: true,
+    frequency: 10
   }, err => {
     if (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
     Quagga.start();
+    Quagga.onDetected(_onQuaggaDetected);
   });
+}
 
-  Quagga.onDetected(onBarcodeDetected);
+function _onQuaggaDetected(result) {
+  const code = result.codeResult.code;
+  const err  = result.codeResult.decodedCodes
+    .filter(c => c.error !== undefined)
+    .reduce((s, c) => s + c.error, 0);
+  // Reject low-confidence reads
+  if (err > 0.25) return;
+  _codeHits[code] = (_codeHits[code] || 0) + 1;
+  if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
+    lastCode = code;
+    stopScanner();
+    const box = document.getElementById('scanner-box');
+    box.classList.add('scan-success');
+    setTimeout(() => box.classList.remove('scan-success'), 700);
+    lookupBarcode(code);
+  }
 }
 
 function stopScanner() {
   if (!scanning) return;
   scanning = false;
-  Quagga.offDetected(onBarcodeDetected);
-  Quagga.stop();
+
+  // Stop native
+  if (_nativeRaf) { cancelAnimationFrame(_nativeRaf); _nativeRaf = null; }
+  if (_nativeStream) { _nativeStream.getTracks().forEach(t => t.stop()); _nativeStream = null; }
+
+  // Stop Quagga if it was used
+  try { Quagga.offDetected(_onQuaggaDetected); Quagga.stop(); } catch (_) {}
+
   document.getElementById('startBtn').disabled = false;
   document.getElementById('stopBtn').disabled  = true;
-}
-
-function onBarcodeDetected(result) {
-  const code = result.codeResult.code;
-  if (code === lastCode) return;
-  lastCode = code;
-  stopScanner();
-  const box = document.getElementById('scanner-box');
-  box.classList.add('scan-success');
-  setTimeout(() => box.classList.remove('scan-success'), 700);
-  lookupBarcode(code);
 }
 
 function manualLookup() {
