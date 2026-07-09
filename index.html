@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodScan</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1>FOOD<span>SCAN</span></h1>
+      <p class="tagline">Point &mdash; Scan &mdash; Know</p>
+      <button id="settingsBtn" onclick="openSettings()">Settings</button>
+    </div>
+  </header>
+
+  <div class="page-grid">
+
+    <main>
+      <section id="scanner-section">
+        <div id="scanner-box">
+          <div id="interactive" class="viewport"></div>
+          <div id="scanner-overlay">
+            <div class="scan-line"></div>
+            <p id="scanner-hint">Align barcode inside the box</p>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="startBtn" onclick="startScanner()">Start Scan</button>
+          <button id="stopBtn" onclick="stopScanner()" disabled>Stop</button>
+        </div>
+        <div id="manual-row">
+          <input type="text" id="manualBarcode" placeholder="Or enter barcode manually..." />
+          <button onclick="manualLookup()">Go</button>
+        </div>
+      </section>
+
+      <div id="loading" class="hidden">
+        <div class="spinner"></div>
+        <p>Fetching product data...</p>
+      </div>
+
+      <div id="error-box" class="hidden">
+        <p id="error-msg">Something went wrong.</p>
+        <button onclick="resetScanner()">Try Again</button>
+      </div>
+    </main>
+
+    <aside id="quotes-panel">
+      <div class="aside-label">On Food &amp; Health</div>
+      <div class="quote-card"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
+      <div class="quote-card"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
+      <div class="quote-card"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
+      <div class="quote-card"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
+      <div class="quote-card"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
+      <div class="quote-card"><p>"Those who have no time for healthy eating will sooner or later have to find time for illness."</p><cite>Edward Stanley</cite></div>
+      <div class="aside-label" style="margin-top:1.5rem">How to Read Grades</div>
+      <div class="grade-guide">
+        <div class="gg-row"><span class="gg-badge A">A</span><span>Excellent — eat freely</span></div>
+        <div class="gg-row"><span class="gg-badge B">B</span><span>Good — solid everyday choice</span></div>
+        <div class="gg-row"><span class="gg-badge C">C</span><span>Moderate — watch portions</span></div>
+        <div class="gg-row"><span class="gg-badge D">D</span><span>Poor — limit consumption</span></div>
+        <div class="gg-row"><span class="gg-badge E">E</span><span>Avoid — very poor profile</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <p>Powered by <a href="https://world.openfoodfacts.org" target="_blank">Open Food Facts</a></p>
+  </footer>
+
+  <!-- ── FULLSCREEN RESULT OVERLAY ── -->
+  <div id="result-overlay" class="hidden">
+
+    <div id="ro-header">
+      <div id="ro-product-info">
+        <img id="ro-img" src="" alt="" />
+        <div>
+          <div id="ro-name">—</div>
+          <div id="ro-brand">—</div>
+          <div id="ro-barcode">—</div>
+        </div>
+      </div>
+      <div id="ro-verdict-block">
+        <div id="ro-verdict-label">—</div>
+        <div id="ro-verdict-sub">—</div>
+      </div>
+      <div id="ro-grade">?</div>
+      <div id="ro-actions">
+        <button onclick="downloadReport()">Download Report</button>
+        <button id="ro-close-btn" onclick="closeResult()">Close</button>
+      </div>
+    </div>
+
+    <nav id="ro-tabs">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('nutrients')">Nutrients</button>
+      <button class="tab-btn" onclick="switchTab('breakdown')">Good / Bad</button>
+      <button class="tab-btn" onclick="switchTab('details')">Details</button>
+    </nav>
+
+    <div id="ro-body">
+
+      <!-- TAB: Overview -->
+      <div class="tab-pane active" id="tab-overview">
+        <div class="tab-grid-2">
+          <div class="chart-card">
+            <div class="chart-title">Macronutrient Split</div>
+            <canvas id="chart-macro"></canvas>
+            <div id="chart-macro-legend" class="chart-legend"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Nutrient Levels vs Daily Reference</div>
+            <canvas id="chart-bars"></canvas>
+          </div>
+        </div>
+        <div id="overview-stats" class="stats-row"></div>
+      </div>
+
+      <!-- TAB: Nutrients -->
+      <div class="tab-pane hidden" id="tab-nutrients">
+        <div class="section-label">Macronutrients <span class="source-tag">per 100g</span></div>
+        <div id="ro-nutrients-grid" class="ro-grid"></div>
+        <div id="ro-micro-section" class="hidden">
+          <div class="section-label">Micronutrients <span class="source-tag">USDA</span></div>
+          <div id="ro-micro-grid" class="ro-grid"></div>
+        </div>
+      </div>
+
+      <!-- TAB: Breakdown -->
+      <div class="tab-pane hidden" id="tab-breakdown">
+        <div id="ro-breakdown">
+          <div class="breakdown-col" id="ro-good-col">
+            <div class="breakdown-heading good-heading">Positives</div>
+            <ul id="ro-good-list"></ul>
+          </div>
+          <div class="breakdown-col" id="ro-bad-col">
+            <div class="breakdown-heading bad-heading">Concerns</div>
+            <ul id="ro-bad-list"></ul>
+          </div>
+        </div>
+        <div id="ro-diet-section" class="hidden">
+          <div class="section-label">Diet Compatibility <span class="source-tag">Edamam</span></div>
+          <div id="ro-diet-tags"></div>
+        </div>
+      </div>
+
+      <!-- TAB: Details -->
+      <div class="tab-pane hidden" id="tab-details">
+        <div id="ro-details-grid"></div>
+      </div>
+
+    </div><!-- /ro-body -->
+  </div><!-- /result-overlay -->
+
+  <!-- Settings Modal -->
+  <div id="settings-backdrop" class="hidden" onclick="closeSettings()"></div>
+  <div id="settings-modal" class="hidden">
+    <div class="modal-header">
+      <h2>API Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">X</button>
+    </div>
+    <p class="modal-intro">Keys are saved in your browser only. Each unlocks richer data when scanning.</p>
+    <div class="api-row">
+      <div class="api-info">
+        <span class="api-name">USDA FoodData Central</span>
+        <span class="api-desc">Micronutrients — vitamins, minerals, % daily value</span>
+        <a href="https://fdc.nal.usda.gov/api-guide.html" target="_blank">Get free key</a>
+      </div>
+      <div class="api-input-row">
+        <span id="usda-status" class="api-status"></span>
+        <input type="password" id="usda-key" placeholder="Paste USDA API key..." />
+      </div>
+    </div>
+    <div class="api-row">
+      <div class="api-info">
+        <span class="api-name">Nutritionix</span>
+        <span class="api-desc">US branded foods fallback + serving sizes</span>
+        <a href="https://developer.nutritionix.com" target="_blank">Get free key</a>
+      </div>
+      <div class="api-input-row">
+        <span id="nutritionix-status" class="api-status"></span>
+        <input type="password" id="nutritionix-app-id" placeholder="App ID..." />
+        <input type="password" id="nutritionix-key" placeholder="App Key..." />
+      </div>
+    </div>
+    <div class="api-row">
+      <div class="api-info">
+        <span class="api-name">Edamam Food Database</span>
+        <span class="api-desc">Diet tags — keto, vegan, diabetic, low-FODMAP...</span>
+        <a href="https://developer.edamam.com" target="_blank">Get free key</a>
+      </div>
+      <div class="api-input-row">
+        <span id="edamam-status" class="api-status"></span>
+        <input type="password" id="edamam-app-id" placeholder="App ID..." />
+        <input type="password" id="edamam-key" placeholder="App Key..." />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="saveSettings()">Save Keys</button>
+      <button class="btn-ghost" onclick="clearSettings()">Clear All</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
