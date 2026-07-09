@@ -955,6 +955,79 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
 .chart-title { font-family: 'Arial Black', Arial, sans-serif; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; color: var(--ink-light); margin-bottom: 0.8rem; }
 .chart-card canvas { display: block; max-width: 260px; margin: 0 auto; }
 #chart-bars { width: 100% !important; max-width: 100%; }
+
+/* ── CSS Donut ── */
+.donut-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.6rem 0;
+}
+.donut-ring {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.donut-hole {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.donut-total {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1;
+}
+.donut-sub {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.55rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-top: 2px;
+}
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin-top: 0.8rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.legend-item strong {
+  display: block;
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
 .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
 .legend-item { display: flex; align-items: center; gap: 0.3rem; font-family: 'Arial', sans-serif; font-size: 0.7rem; }
 .legend-dot { width: 10px; height: 10px; flex-shrink: 0; }
