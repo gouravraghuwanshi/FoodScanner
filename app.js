@@ -1,6 +1,7 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let scanning = false;
 let lastCode = null;
+let _resizeTimer = null;
 
 // ── Settings ───────────────────────────────────────────────────────────────
 const KEYS = {
@@ -114,12 +115,15 @@ function onBarcodeDetected(result) {
   if (code === lastCode) return;
   lastCode = code;
   stopScanner();
+  const box = document.getElementById('scanner-box');
+  box.classList.add('scan-success');
+  setTimeout(() => box.classList.remove('scan-success'), 700);
   lookupBarcode(code);
 }
 
 function manualLookup() {
   const code = document.getElementById('manualBarcode').value.trim();
-  if (!code) return;
+  if (!code) { document.getElementById('manualBarcode').focus(); return; }
   stopScanner();
   lookupBarcode(code);
 }
@@ -495,8 +499,8 @@ function openResultOverlay(n) {
   document.getElementById('result-overlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   switchTab('overview');
-  drawMacroDonut(n);
-  drawBarsChart(n);
+  requestAnimationFrame(() => { drawMacroDonut(n); drawBarsChart(n); });
+  showToast('Product found');
 }
 
 function closeResult() {
@@ -684,6 +688,19 @@ function hideError()     { document.getElementById('error-box').classList.add('h
 function show(id)        { document.getElementById(id).classList.remove('hidden'); }
 function hide(id)        { document.getElementById(id).classList.add('hidden'); }
 
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden', 'toast-hide');
+  t.classList.add('toast-show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    t.classList.replace('toast-show', 'toast-hide');
+    setTimeout(() => t.classList.add('hidden'), 320);
+  }, 2200);
+}
+
 function resetScanner() {
   hide('result-overlay');
   document.body.style.overflow = '';
@@ -693,5 +710,24 @@ function resetScanner() {
   show('scanner-section');
 }
 
-// Init — show dots on load
+// Init
 updateStatusDots(getKeys());
+
+document.getElementById('manualBarcode').addEventListener('keydown', e => {
+  if (e.key === 'Enter') manualLookup();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('result-overlay').classList.contains('hidden'))
+    closeResult();
+});
+
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    if (_currentProduct && !document.getElementById('result-overlay').classList.contains('hidden')) {
+      drawMacroDonut(_currentProduct.nutriments || {});
+      drawBarsChart(_currentProduct.nutriments || {});
+    }
+  }, 200);
+});

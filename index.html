@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FoodScan</title>
+  <title>FoodScan — Know What You Eat</title>
+  <meta name="description" content="Scan any food barcode instantly and get a full nutritional breakdown, grade, and health verdict." />
+  <meta name="theme-color" content="#1c1c1c" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -32,7 +34,7 @@
           <button id="stopBtn" onclick="stopScanner()" disabled>Stop</button>
         </div>
         <div id="manual-row">
-          <input type="text" id="manualBarcode" placeholder="Or enter barcode manually..." />
+          <input type="text" id="manualBarcode" placeholder="Or enter barcode manually..." autocomplete="off" inputmode="numeric" />
           <button onclick="manualLookup()">Go</button>
         </div>
       </section>
@@ -206,5 +208,8 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
   <script src="app.js"></script>
+
+  <!-- Toast -->
+  <div id="toast"></div>
 </body>
 </html>
