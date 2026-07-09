@@ -634,10 +634,7 @@ function drawMacroDonut(n) {
     <div class="chart-title">Macronutrient Split</div>
     <div class="donut-wrap">
       <div class="donut-ring" style="background:conic-gradient(${stops.join(',')})">
-        <div class="donut-hole">
-          <div class="donut-total">${total > 0 ? Math.round(total) + 'g' : '—'}</div>
-          <div class="donut-sub">per 100g</div>
-        </div>
+        <div class="donut-hole"></div>
       </div>
     </div>
     <div class="chart-legend" id="chart-macro-legend">
