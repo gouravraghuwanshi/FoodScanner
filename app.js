@@ -10,6 +10,7 @@ const KEYS = {
   nutritionixKey:  'fs_nix_key',
   edamamId:        'fs_edamam_id',
   edamamKey:       'fs_edamam_key',
+  spoonacular:     'fs_spoonacular_key',
 };
 
 function getKeys() {
@@ -19,16 +20,18 @@ function getKeys() {
     nutritionixKey: localStorage.getItem(KEYS.nutritionixKey) || '',
     edamamId:       localStorage.getItem(KEYS.edamamId) || '',
     edamamKey:      localStorage.getItem(KEYS.edamamKey) || '',
+    spoonacular:    localStorage.getItem(KEYS.spoonacular) || '',
   };
 }
 
 function openSettings() {
   const k = getKeys();
-  document.getElementById('usda-key').value        = k.usda;
+  document.getElementById('usda-key').value           = k.usda;
   document.getElementById('nutritionix-app-id').value = k.nutritionixId;
-  document.getElementById('nutritionix-key').value = k.nutritionixKey;
-  document.getElementById('edamam-app-id').value   = k.edamamId;
-  document.getElementById('edamam-key').value      = k.edamamKey;
+  document.getElementById('nutritionix-key').value    = k.nutritionixKey;
+  document.getElementById('edamam-app-id').value      = k.edamamId;
+  document.getElementById('edamam-key').value         = k.edamamKey;
+  document.getElementById('spoonacular-key').value    = k.spoonacular;
   updateStatusDots(k);
   document.getElementById('settings-backdrop').classList.remove('hidden');
   document.getElementById('settings-modal').classList.remove('hidden');
@@ -46,27 +49,30 @@ function saveSettings() {
     nutritionixKey: document.getElementById('nutritionix-key').value.trim(),
     edamamId:       document.getElementById('edamam-app-id').value.trim(),
     edamamKey:      document.getElementById('edamam-key').value.trim(),
+    spoonacular:    document.getElementById('spoonacular-key').value.trim(),
   };
   localStorage.setItem(KEYS.usda,           k.usda);
   localStorage.setItem(KEYS.nutritionixId,  k.nutritionixId);
   localStorage.setItem(KEYS.nutritionixKey, k.nutritionixKey);
   localStorage.setItem(KEYS.edamamId,       k.edamamId);
   localStorage.setItem(KEYS.edamamKey,      k.edamamKey);
+  localStorage.setItem(KEYS.spoonacular,    k.spoonacular);
   updateStatusDots(k);
   closeSettings();
 }
 
 function clearSettings() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k));
-  ['usda-key','nutritionix-app-id','nutritionix-key','edamam-app-id','edamam-key']
+  ['usda-key','nutritionix-app-id','nutritionix-key','edamam-app-id','edamam-key','spoonacular-key']
     .forEach(id => document.getElementById(id).value = '');
   updateStatusDots(getKeys());
 }
 
 function updateStatusDots(k) {
-  setDot('usda-status',        !!k.usda);
-  setDot('nutritionix-status', !!(k.nutritionixId && k.nutritionixKey));
-  setDot('edamam-status',      !!(k.edamamId && k.edamamKey));
+  setDot('usda-status',         !!k.usda);
+  setDot('nutritionix-status',  !!(k.nutritionixId && k.nutritionixKey));
+  setDot('edamam-status',       !!(k.edamamId && k.edamamKey));
+  setDot('spoonacular-status',  !!k.spoonacular);
 }
 
 function setDot(id, active) {
@@ -236,28 +242,37 @@ async function lookupBarcode(code) {
   hideError();
 
   try {
-    // Always fetch Open Food Facts first
     const offRes  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
     const offData = await offRes.json();
     if (offData.status !== 1) throw new Error('Product not found in database.');
 
-    const product = offData.product;
-    const keys    = getKeys();
+    let product = offData.product;
+    const keys  = getKeys();
 
-    // Fire extra APIs in parallel — failures are silently ignored
+    // If OFF has no nutrient data and Spoonacular key is set, try it as a fallback
+    const offHasNutrients = Object.keys(product.nutriments || {}).some(k => k.endsWith('_100g') && parseFloat(product.nutriments[k]) > 0);
+    if (!offHasNutrients && keys.spoonacular) {
+      try {
+        const spoon = await fetchSpoonacular(code, keys.spoonacular);
+        if (spoon) {
+          product = {
+            ...product,
+            nutriments: spoon.nutriments,
+            product_name: product.product_name || spoon.product_name,
+            image_url: product.image_url || spoon.image_url,
+            _nutrient_source: 'Spoonacular',
+          };
+        }
+      } catch (_) {}
+    }
+
     const [usdaData, nixData, edamamData] = await Promise.allSettled([
-      keys.usda                              ? fetchUSDA(product, keys.usda)                              : Promise.resolve(null),
+      keys.usda                               ? fetchUSDA(product, keys.usda)                                : Promise.resolve(null),
       keys.nutritionixId && keys.nutritionixKey ? fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey) : Promise.resolve(null),
-      keys.edamamId && keys.edamamKey        ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey) : Promise.resolve(null),
+      keys.edamamId && keys.edamamKey         ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey)   : Promise.resolve(null),
     ]);
 
-    showResult(
-      product,
-      code,
-      usdaData.value    || null,
-      nixData.value     || null,
-      edamamData.value  || null
-    );
+    showResult(product, code, usdaData.value || null, nixData.value || null, edamamData.value || null);
   } catch (e) {
     showError(e.message || 'Could not fetch product data.');
   } finally {
@@ -284,6 +299,28 @@ async function fetchNutritionix(barcode, appId, appKey) {
   );
   const data = await res.json();
   return data.foods?.[0] || null;
+}
+
+// ── Spoonacular ────────────────────────────────────────────────────────────
+async function fetchSpoonacular(barcode, apiKey) {
+  const res  = await fetch(`https://api.spoonacular.com/food/products/upc/${barcode}?apiKey=${apiKey}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data.nutrition) return null;
+  // Normalise to the same shape as OFF nutriments
+  const n = {};
+  const nutrients = data.nutrition.nutrients || [];
+  const find = name => parseFloat(nutrients.find(x => x.name === name)?.amount) || 0;
+  n['energy-kcal_100g']   = find('Calories');
+  n['fat_100g']           = find('Fat');
+  n['saturated-fat_100g'] = find('Saturated Fat');
+  n['carbohydrates_100g'] = find('Carbohydrates');
+  n['sugars_100g']        = find('Sugar');
+  n['fiber_100g']         = find('Fiber');
+  n['proteins_100g']      = find('Protein');
+  n['salt_100g']          = (find('Sodium') * 2.5) / 1000; // mg sodium → g salt
+  n['sodium_100g']        = find('Sodium') / 1000;
+  return { nutriments: n, product_name: data.title, image_url: data.image };
 }
 
 // ── Edamam ─────────────────────────────────────────────────────────────────
