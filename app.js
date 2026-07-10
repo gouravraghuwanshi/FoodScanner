@@ -265,41 +265,111 @@ function manualLookup() {
 async function lookupBarcode(code) {
   showLoading(true);
   hideError();
+  hide('not-found-panel');
 
   try {
+    // 1. Try Open Food Facts
     const offRes  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
     const offData = await offRes.json();
-    if (offData.status !== 1) throw new Error('Product not found in database.');
+    const keys    = getKeys();
 
-    let product = offData.product;
-    const keys  = getKeys();
+    if (offData.status === 1) {
+      let product = offData.product;
 
-    // If OFF has no nutrient data and Spoonacular key is set, try it as a fallback
-    const offHasNutrients = Object.keys(product.nutriments || {}).some(k => k.endsWith('_100g') && parseFloat(product.nutriments[k]) > 0);
-    if (!offHasNutrients && keys.spoonacular) {
+      // Enrich nutrients from Spoonacular if OFF has none
+      const offHasNutrients = Object.keys(product.nutriments || {}).some(k => k.endsWith('_100g') && parseFloat(product.nutriments[k]) > 0);
+      if (!offHasNutrients && keys.spoonacular) {
+        try {
+          const spoon = await fetchSpoonacular(code, keys.spoonacular);
+          if (spoon) product = { ...product, nutriments: spoon.nutriments, product_name: product.product_name || spoon.product_name, image_url: product.image_url || spoon.image_url };
+        } catch (_) {}
+      }
+
+      const [usdaData, nixData, edamamData] = await Promise.allSettled([
+        keys.usda                                ? fetchUSDA(product, keys.usda)                                  : Promise.resolve(null),
+        keys.nutritionixId && keys.nutritionixKey ? fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey) : Promise.resolve(null),
+        keys.edamamId && keys.edamamKey          ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey)       : Promise.resolve(null),
+      ]);
+      showResult(product, code, usdaData.value || null, nixData.value || null, edamamData.value || null);
+      return;
+    }
+
+    // 2. Try Nutritionix UPC (if key set)
+    if (keys.nutritionixId && keys.nutritionixKey) {
       try {
-        const spoon = await fetchSpoonacular(code, keys.spoonacular);
-        if (spoon) {
-          product = {
-            ...product,
-            nutriments: spoon.nutriments,
-            product_name: product.product_name || spoon.product_name,
-            image_url: product.image_url || spoon.image_url,
-            _nutrient_source: 'Spoonacular',
-          };
+        const nixFood = await fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey);
+        if (nixFood) {
+          const product = _nixToProduct(nixFood, code);
+          showResult(product, code, null, nixFood, null);
+          return;
         }
       } catch (_) {}
     }
 
-    const [usdaData, nixData, edamamData] = await Promise.allSettled([
-      keys.usda                               ? fetchUSDA(product, keys.usda)                                : Promise.resolve(null),
-      keys.nutritionixId && keys.nutritionixKey ? fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey) : Promise.resolve(null),
-      keys.edamamId && keys.edamamKey         ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey)   : Promise.resolve(null),
-    ]);
+    // 3. Try Spoonacular UPC (if key set)
+    if (keys.spoonacular) {
+      try {
+        const spoon = await fetchSpoonacular(code, keys.spoonacular);
+        if (spoon) {
+          const product = { product_name: spoon.product_name, image_url: spoon.image_url, nutriments: spoon.nutriments, brands: '', allergens_tags: [], additives_tags: [], labels_tags: [], countries_tags: [] };
+          showResult(product, code, null, null, null);
+          return;
+        }
+      } catch (_) {}
+    }
 
-    showResult(product, code, usdaData.value || null, nixData.value || null, edamamData.value || null);
+    // 4. Nothing found — show search panel
+    showNotFound(code);
+
   } catch (e) {
     showError(e.message || 'Could not fetch product data.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function _nixToProduct(nix, code) {
+  return {
+    product_name:   nix.food_name || nix.brand_name || code,
+    brands:         nix.brand_name || '',
+    image_url:      nix.photo?.thumb || '',
+    serving_size:   nix.serving_unit ? `${nix.serving_qty} ${nix.serving_unit}` : '',
+    allergens_tags: [], additives_tags: [], labels_tags: [], countries_tags: [],
+    nutriments: {
+      'energy-kcal_100g':   nix.nf_calories,
+      'fat_100g':           nix.nf_total_fat,
+      'saturated-fat_100g': nix.nf_saturated_fat,
+      'carbohydrates_100g': nix.nf_total_carbohydrate,
+      'sugars_100g':        nix.nf_sugars,
+      'fiber_100g':         nix.nf_dietary_fiber,
+      'proteins_100g':      nix.nf_protein,
+      'sodium_100g':        (nix.nf_sodium || 0) / 1000,
+      'salt_100g':          (nix.nf_sodium || 0) * 2.5 / 1000,
+    }
+  };
+}
+
+function showNotFound(code) {
+  const panel = document.getElementById('not-found-panel');
+  document.getElementById('nf-barcode').textContent = code;
+  document.getElementById('nf-search-input').value  = '';
+  document.getElementById('nf-google-btn').href = `https://www.google.com/search?q=${encodeURIComponent(code + ' barcode food')}`;
+  panel.classList.remove('hidden');
+}
+
+async function searchByName() {
+  const query = document.getElementById('nf-search-input').value.trim();
+  if (!query) return;
+  showLoading(true);
+  hide('not-found-panel');
+  try {
+    const res  = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=1`);
+    const data = await res.json();
+    const product = data.products?.[0];
+    if (!product) { showNotFound(''); document.getElementById('nf-search-input').value = query; showError('No results found for "' + query + '"'); return; }
+    showResult(product, product.code || query, null, null, null);
+  } catch (e) {
+    showError('Search failed: ' + e.message);
   } finally {
     showLoading(false);
   }
@@ -870,6 +940,7 @@ function showToast(msg) {
 
 function resetScanner() {
   hide('result-overlay');
+  hide('not-found-panel');
   document.body.style.overflow = '';
   hideError();
   lastCode = null;
@@ -879,6 +950,10 @@ function resetScanner() {
 
 // Init
 updateStatusDots(getKeys());
+
+if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+  showError('Camera requires HTTPS. Please use the secure version of this site.');
+}
 
 document.getElementById('manualBarcode').addEventListener('keydown', e => {
   if (e.key === 'Enter') manualLookup();

@@ -67,6 +67,20 @@
         <p id="error-msg">Something went wrong.</p>
         <button onclick="resetScanner()">Try Again</button>
       </div>
+
+      <div id="not-found-panel" class="hidden">
+        <div class="nf-icon">🔍</div>
+        <div class="nf-title">Product Not Found</div>
+        <div class="nf-sub">Barcode <strong id="nf-barcode"></strong> isn't in any database we checked.</div>
+        <div class="nf-search-row">
+          <input type="text" id="nf-search-input" placeholder="Type product name to search..." />
+          <button onclick="searchByName()">Search</button>
+        </div>
+        <div class="nf-actions">
+          <a id="nf-google-btn" href="#" target="_blank" rel="noopener" class="nf-link">🌐 Search on Google</a>
+          <button class="btn-ghost" onclick="resetScanner()">Scan Again</button>
+        </div>
+      </div>
     </main>
 
     <aside id="quotes-panel">
