@@ -85,8 +85,7 @@ function setDot(id, active) {
 let _nativeStream = null;
 let _nativeRaf    = null;
 let _codeHits     = {};
-// Phones (rear cam) are high-res — need 3 hits. Laptops (front cam) are lower quality — use 2.
-const CONFIRM_HITS = /Mobi|Android/i.test(navigator.userAgent) ? 3 : 2;
+const CONFIRM_HITS = 2;
 
 function startScanner() {
   if (scanning) return;
@@ -97,10 +96,7 @@ function startScanner() {
   document.getElementById('stopBtn').disabled  = false;
   document.getElementById('scanner-hint').textContent = 'Align barcode inside the box';
 
-  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-  // On desktop/laptop: BarcodeDetector struggles with front cameras — use Quagga which
-  // has better tolerance for low-res feeds. On mobile: prefer native BarcodeDetector.
-  if (isMobile && typeof BarcodeDetector !== 'undefined') {
+  if (typeof BarcodeDetector !== 'undefined') {
     _startNativeScanner();
   } else {
     _startQuaggaScanner();
@@ -119,19 +115,25 @@ async function _startNativeScanner() {
   viewport.innerHTML = '';
   viewport.appendChild(video);
 
-  // Try rear camera first (phones); fall back to any camera (laptops)
-  try {
-    _nativeStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-  } catch (_) {
+  // Try rear camera, then any camera
+  const videoConstraints = [
+    { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    { facingMode: { exact: 'environment' } },
+    { width: { ideal: 1280 }, height: { ideal: 720 } },
+    true
+  ];
+  let gotStream = false;
+  for (const constraint of videoConstraints) {
     try {
-      _nativeStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    } catch (err) {
-      showError('Camera error: ' + err.message);
-      stopScanner();
-      return;
-    }
+      _nativeStream = await navigator.mediaDevices.getUserMedia({ video: constraint });
+      gotStream = true;
+      break;
+    } catch (_) {}
+  }
+  if (!gotStream) {
+    showError('Camera not accessible. Please allow camera permission.');
+    stopScanner();
+    return;
   }
 
   video.srcObject = _nativeStream;
@@ -172,16 +174,16 @@ async function _startNativeScanner() {
 
 // ── QuaggaJS fallback ──────────────────────────────────────────────────────
 function _startQuaggaScanner() {
-  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
   Quagga.init({
     inputStream: {
       type: 'LiveStream',
       target: document.getElementById('interactive'),
       constraints: {
-        facingMode: isMobile ? 'environment' : 'user',
+        facingMode: { ideal: 'environment' },
         width: { ideal: 1280 }, height: { ideal: 720 }
       }
     },
+    numOfWorkers: 0,
     decoder: {
       readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'],
       multiple: false
@@ -201,7 +203,7 @@ function _onQuaggaDetected(result) {
     .filter(c => c.error !== undefined)
     .reduce((s, c) => s + c.error, 0);
   // Laptops get a relaxed threshold — front cameras are lower quality than phone rear cams
-  const maxErr = /Mobi|Android/i.test(navigator.userAgent) ? 0.25 : 0.4;
+  const maxErr = 0.4;
   if (err > maxErr) return;
   _codeHits[code] = (_codeHits[code] || 0) + 1;
   if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
