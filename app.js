@@ -375,6 +375,11 @@ function calcGrade(product) {
   const n   = product.nutriments || {};
   const per = v => parseFloat(v) || 0;
 
+  // If all key nutrients are zero, data is missing — don't fabricate a grade
+  const hasData = ['energy-kcal_100g','fat_100g','sugars_100g','proteins_100g','carbohydrates_100g']
+    .some(k => per(n[k]) > 0);
+  if (!hasData) return { grade: '?', source: 'No data' };
+
   let penalty = 0;
   penalty += Math.min(per(n['energy-kcal_100g'])    / 900, 1) * 30;
   penalty += Math.min(per(n['saturated-fat_100g'])  / 10,  1) * 25;
@@ -410,10 +415,16 @@ function showResult(product, code, usdaNutrients, nixFood, edamamLabels) {
   document.getElementById('ro-verdict-sub').textContent   = analysis.sub;
 
   // Grade
-  const { grade } = calcGrade(product);
+  const { grade, source } = calcGrade(product);
   const gb = document.getElementById('ro-grade');
   gb.textContent = grade;
-  gb.className   = 'grade-' + grade;
+  gb.className   = grade === '?' ? 'grade-unknown' : 'grade-' + grade;
+
+  // If no nutrient data, show warning and skip charts/stats
+  const noData = grade === '?';
+  document.getElementById('ro-verdict-label').textContent = noData ? 'No Nutrient Data' : analysis.verdict;
+  document.getElementById('ro-verdict-sub').textContent   = noData ? 'This product exists in the database but nutritional values have not been filled in yet.' : analysis.sub;
+  if (noData) vb.className = 'verdict-block verdict-neutral';
 
   // Good / Bad lists
   document.getElementById('ro-good-list').innerHTML = analysis.good.length
