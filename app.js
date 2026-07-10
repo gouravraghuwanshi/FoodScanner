@@ -9,7 +9,6 @@ const KEYS = {
   edamamId:    'fs_edamam_id',
   edamamKey:   'fs_edamam_key',
   spoonacular: 'fs_spoonacular_key',
-  goupc:       'fs_goupc_key',
 };
 
 function getKeys() {
@@ -18,7 +17,6 @@ function getKeys() {
     edamamId:    localStorage.getItem(KEYS.edamamId) || '',
     edamamKey:   localStorage.getItem(KEYS.edamamKey) || '',
     spoonacular: localStorage.getItem(KEYS.spoonacular) || '',
-    goupc:       localStorage.getItem(KEYS.goupc) || '',
   };
 }
 
@@ -28,7 +26,6 @@ function openSettings() {
   document.getElementById('edamam-app-id').value   = k.edamamId;
   document.getElementById('edamam-key').value      = k.edamamKey;
   document.getElementById('spoonacular-key').value = k.spoonacular;
-  document.getElementById('goupc-key').value       = k.goupc;
   updateStatusDots(k);
   document.getElementById('settings-backdrop').classList.remove('hidden');
   document.getElementById('settings-modal').classList.remove('hidden');
@@ -45,20 +42,18 @@ function saveSettings() {
     edamamId:    document.getElementById('edamam-app-id').value.trim(),
     edamamKey:   document.getElementById('edamam-key').value.trim(),
     spoonacular: document.getElementById('spoonacular-key').value.trim(),
-    goupc:       document.getElementById('goupc-key').value.trim(),
   };
   localStorage.setItem(KEYS.usda,        k.usda);
   localStorage.setItem(KEYS.edamamId,    k.edamamId);
   localStorage.setItem(KEYS.edamamKey,   k.edamamKey);
   localStorage.setItem(KEYS.spoonacular, k.spoonacular);
-  localStorage.setItem(KEYS.goupc,       k.goupc);
   updateStatusDots(k);
   closeSettings();
 }
 
 function clearSettings() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k));
-  ['usda-key','edamam-app-id','edamam-key','spoonacular-key','goupc-key']
+  ['usda-key','edamam-app-id','edamam-key','spoonacular-key']
     .forEach(id => document.getElementById(id).value = '');
   updateStatusDots(getKeys());
 }
@@ -67,7 +62,6 @@ function updateStatusDots(k) {
   setDot('usda-status',        !!k.usda);
   setDot('edamam-status',      !!(k.edamamId && k.edamamKey));
   setDot('spoonacular-status', !!k.spoonacular);
-  setDot('goupc-status',       !!k.goupc);
 }
 
 function setDot(id, active) {
@@ -310,29 +304,7 @@ async function lookupBarcode(code) {
       } catch (_) {}
     }
 
-    // 4. Try Go UPC (if key set)
-    if (keys.goupc) {
-      try {
-        const guRes  = await fetch(`https://go-upc.com/api/v1/code/${code}`, { headers: { 'Authorization': `Bearer ${keys.goupc}` } });
-        if (guRes.ok) {
-          const guData = await guRes.json();
-          if (guData.product) {
-            const p = guData.product;
-            const product = {
-              product_name:   p.name || code,
-              brands:         p.brand || '',
-              image_url:      p.imageUrl || '',
-              allergens_tags: [], additives_tags: [], labels_tags: [], countries_tags: [],
-              nutriments: {}
-            };
-            showResult(product, code, null, null);
-            return;
-          }
-        }
-      } catch (_) {}
-    }
-
-    // 5. Nothing found — show search panel
+    // 4. Nothing found — show search panel
     showNotFound(code);
 
   } catch (e) {
