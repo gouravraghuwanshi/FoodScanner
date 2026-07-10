@@ -77,25 +77,11 @@
           <button onclick="searchByName()">Search</button>
         </div>
         <div class="nf-actions">
-          <button onclick="startLabelScan()" class="nf-label-btn">📷 Scan Nutrition Label</button>
-          <a id="nf-google-btn" href="#" target="_blank" rel="noopener" class="nf-link">🌐 Google</a>
+          <a id="nf-google-btn" href="#" target="_blank" rel="noopener" class="nf-link">🌐 Search on Google</a>
           <button class="btn-ghost" onclick="resetScanner()">Scan Again</button>
         </div>
       </div>
 
-      <div id="label-scan-panel" class="hidden">
-        <div class="ls-header">
-          <span class="ls-title">📋 Point camera at nutrition table</span>
-          <button class="btn-ghost" onclick="stopLabelScan()">Cancel</button>
-        </div>
-        <div id="ls-viewfinder">
-          <video id="ls-video" playsinline autoplay muted></video>
-          <div class="ls-guide">Align the nutrition facts table inside this box</div>
-        </div>
-        <button id="ls-capture-btn" onclick="captureLabel()">Capture &amp; Analyse</button>
-        <canvas id="ls-canvas" class="hidden"></canvas>
-        <div id="ls-status" class="hidden"></div>
-      </div>
     </main>
 
     <aside id="quotes-panel">
@@ -276,7 +262,6 @@
   </div>
 
   <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 
   <!-- Toast -->
