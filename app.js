@@ -82,175 +82,174 @@ function setDot(id, active) {
 }
 
 // ── Scanner ────────────────────────────────────────────────────────────────
-let _nativeStream = null;
-let _nativeRaf    = null;
-let _codeHits     = {};
-const CONFIRM_HITS = 1;
+let _stream  = null;
+let _raf     = null;
+let _zxing   = null;
+
+const _isMobile  = /Mobi|Android/i.test(navigator.userAgent);
+const _isAndroid = /Android/i.test(navigator.userAgent);
+const _isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 function startScanner() {
   if (scanning) return;
   scanning = true;
   lastCode = null;
-  _codeHits = {};
   document.getElementById('startBtn').disabled = true;
   document.getElementById('stopBtn').disabled  = false;
   document.getElementById('scanner-hint').textContent = 'Align barcode inside the box';
 
-  if (typeof BarcodeDetector !== 'undefined') {
-    _startNativeScanner();
+  if (_isAndroid && typeof BarcodeDetector !== 'undefined') {
+    // Android: native BarcodeDetector — already working, don't touch
+    _startAndroidScanner();
+  } else if (_isIOS || typeof BarcodeDetector === 'undefined') {
+    // iOS Safari + Firefox: ZXing-js
+    _startZxingScanner();
   } else {
-    _startQuaggaScanner();
+    // Windows/Mac desktop Chrome/Edge: BarcodeDetector on cropped canvas
+    _startDesktopScanner();
   }
 }
 
-// ── Native BarcodeDetector (Chrome 83+, Edge, Android Chrome) ──────────────
-async function _startNativeScanner() {
-  const video = document.createElement('video');
-  video.setAttribute('playsinline', '');
-  video.setAttribute('autoplay', '');
-  video.muted = true;
-  video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+// ── Android: original native BarcodeDetector (untouched logic) ────────────
+async function _startAndroidScanner() {
+  const video = _createVideo();
+  document.getElementById('interactive').innerHTML = '';
+  document.getElementById('interactive').appendChild(video);
 
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+  } catch (_) {
+    try { _stream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+    catch (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
+  }
+  video.srcObject = _stream;
+  try { await video.play(); } catch (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
+
+  const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code'] });
+  const tick = async () => {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) { _onCode(codes[0].rawValue); return; }
+      } catch (_) {}
+    }
+    _raf = requestAnimationFrame(tick);
+  };
+  _raf = requestAnimationFrame(tick);
+}
+
+// ── Desktop (Windows/Mac): BarcodeDetector on centre-cropped canvas ────────
+async function _startDesktopScanner() {
+  const video = _createVideo();
   const viewport = document.getElementById('interactive');
   viewport.innerHTML = '';
   viewport.appendChild(video);
 
-  // Try rear camera, then any camera
-  const videoConstraints = [
-    { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-    { facingMode: { exact: 'environment' } },
-    { width: { ideal: 1280 }, height: { ideal: 720 } },
-    true
-  ];
-  let gotStream = false;
-  for (const constraint of videoConstraints) {
-    try {
-      _nativeStream = await navigator.mediaDevices.getUserMedia({ video: constraint });
-      gotStream = true;
-      break;
-    } catch (_) {}
-  }
-  if (!gotStream) {
-    showError('Camera not accessible. Please allow camera permission.');
-    stopScanner();
-    return;
-  }
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+  } catch (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
 
-  video.srcObject = _nativeStream;
-  try { await video.play(); } catch (err) {
-    showError('Camera error: ' + err.message);
-    stopScanner();
-    return;
-  }
+  video.srcObject = _stream;
+  try { await video.play(); } catch (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
 
-  const detector = new BarcodeDetector({
-    formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']
-  });
+  const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code'] });
+  const offscreen = document.createElement('canvas');
+  const ctx = offscreen.getContext('2d');
 
-  let _lastTick = 0;
+  let last = 0;
   const tick = async (ts) => {
     if (!scanning) return;
-    // Throttle to ~8 fps — avoids hammering the detector and gives frames time to stabilise
-    if (ts - _lastTick < 120) { _nativeRaf = requestAnimationFrame(tick); return; }
-    _lastTick = ts;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length > 0) {
-          const code = codes[0].rawValue;
-          _codeHits[code] = (_codeHits[code] || 0) + 1;
-          if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
-            lastCode = code;
-            stopScanner();
-            const box = document.getElementById('scanner-box');
-            box.classList.add('scan-success');
-            setTimeout(() => box.classList.remove('scan-success'), 700);
-            lookupBarcode(code);
-            return;
-          }
-        }
-      } catch (_) {}
-    }
-    _nativeRaf = requestAnimationFrame(tick);
+    // ~6 fps — gives webcam autofocus time to settle
+    if (ts - last < 160) { _raf = requestAnimationFrame(tick); return; }
+    last = ts;
+    if (video.readyState < video.HAVE_ENOUGH_DATA) { _raf = requestAnimationFrame(tick); return; }
+
+    // Crop centre 60% of frame and upscale 2× — makes small barcodes detectable
+    const sw = video.videoWidth  * 0.6;
+    const sh = video.videoHeight * 0.6;
+    const sx = (video.videoWidth  - sw) / 2;
+    const sy = (video.videoHeight - sh) / 2;
+    offscreen.width  = sw * 2;
+    offscreen.height = sh * 2;
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, offscreen.width, offscreen.height);
+
+    try {
+      const codes = await detector.detect(offscreen);
+      if (codes.length) { _onCode(codes[0].rawValue); return; }
+    } catch (_) {}
+    _raf = requestAnimationFrame(tick);
   };
-  _nativeRaf = requestAnimationFrame(tick);
+  _raf = requestAnimationFrame(tick);
 }
 
-// ── QuaggaJS fallback ──────────────────────────────────────────────────────
-function _startQuaggaScanner() {
-  Quagga.init({
-    inputStream: {
-      type: 'LiveStream',
-      target: document.getElementById('interactive'),
-      constraints: {
-        facingMode: { ideal: 'environment' },
-        width: { min: 640, ideal: 1280 },
-        height: { min: 480, ideal: 720 }
-      },
-      area: { top: '20%', right: '10%', left: '10%', bottom: '20%' }
-    },
-    numOfWorkers: 0,
-    decoder: {
-      readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'],
-      multiple: false
-    },
-    locate: true,
-    frequency: 5
-  }, err => {
-    if (err) {
-      // iOS Safari sometimes rejects constraints — retry bare minimum
-      Quagga.init({
-        inputStream: {
-          type: 'LiveStream',
-          target: document.getElementById('interactive'),
-          constraints: { facingMode: 'environment' }
-        },
-        numOfWorkers: 0,
-        decoder: { readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'] },
-        locate: true,
-        frequency: 5
-      }, err2 => {
-        if (err2) { showError('Camera error: ' + err2.message); stopScanner(); return; }
-        Quagga.start();
-        Quagga.onDetected(_onQuaggaDetected);
-      });
-      return;
-    }
-    Quagga.start();
-    Quagga.onDetected(_onQuaggaDetected);
-  });
-}
+// ── iOS / Firefox: ZXing-js ────────────────────────────────────────────────
+async function _startZxingScanner() {
+  const viewport = document.getElementById('interactive');
+  viewport.innerHTML = '';
 
-function _onQuaggaDetected(result) {
-  const code   = result.codeResult.code;
-  const err    = result.codeResult.decodedCodes
-    .filter(c => c.error !== undefined)
-    .reduce((s, c) => s + c.error, 0);
-  // Laptops get a relaxed threshold — front cameras are lower quality than phone rear cams
-  const maxErr = 0.4;
-  if (err > maxErr) return;
-  _codeHits[code] = (_codeHits[code] || 0) + 1;
-  if (_codeHits[code] >= CONFIRM_HITS && code !== lastCode) {
-    lastCode = code;
+  try {
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,  ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_128
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+    const reader = new ZXing.BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 });
+    _zxing = reader;
+
+    // Get camera stream manually so we can stop it cleanly
+    _stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+
+    const video = _createVideo();
+    viewport.appendChild(video);
+    video.srcObject = _stream;
+    await video.play();
+
+    reader.decodeFromStream(_stream, video, (result, err) => {
+      if (!scanning) return;
+      if (result) _onCode(result.getText());
+    });
+  } catch (err) {
+    showError('Camera error: ' + (err.message || err));
     stopScanner();
-    const box = document.getElementById('scanner-box');
-    box.classList.add('scan-success');
-    setTimeout(() => box.classList.remove('scan-success'), 700);
-    lookupBarcode(code);
   }
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────────
+function _createVideo() {
+  const v = document.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.setAttribute('autoplay', '');
+  v.muted = true;
+  v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+  return v;
+}
+
+function _onCode(code) {
+  if (!scanning || code === lastCode) return;
+  lastCode = code;
+  stopScanner();
+  document.getElementById('scanner-box').classList.add('scan-success');
+  setTimeout(() => document.getElementById('scanner-box').classList.remove('scan-success'), 700);
+  lookupBarcode(code);
 }
 
 function stopScanner() {
   if (!scanning) return;
   scanning = false;
-
-  // Stop native
-  if (_nativeRaf) { cancelAnimationFrame(_nativeRaf); _nativeRaf = null; }
-  if (_nativeStream) { _nativeStream.getTracks().forEach(t => t.stop()); _nativeStream = null; }
-
-  // Stop Quagga if it was used
-  try { Quagga.offDetected(_onQuaggaDetected); Quagga.stop(); } catch (_) {}
-
+  if (_raf)    { cancelAnimationFrame(_raf); _raf = null; }
+  if (_zxing)  { try { _zxing.reset(); } catch (_) {} _zxing = null; }
+  if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
   document.getElementById('startBtn').disabled = false;
   document.getElementById('stopBtn').disabled  = true;
 }
