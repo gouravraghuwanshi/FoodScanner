@@ -85,7 +85,7 @@ function setDot(id, active) {
 let _nativeStream = null;
 let _nativeRaf    = null;
 let _codeHits     = {};
-const CONFIRM_HITS = 2;
+const CONFIRM_HITS = 1;
 
 function startScanner() {
   if (scanning) return;
@@ -147,8 +147,12 @@ async function _startNativeScanner() {
     formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']
   });
 
-  const tick = async () => {
+  let _lastTick = 0;
+  const tick = async (ts) => {
     if (!scanning) return;
+    // Throttle to ~8 fps — avoids hammering the detector and gives frames time to stabilise
+    if (ts - _lastTick < 120) { _nativeRaf = requestAnimationFrame(tick); return; }
+    _lastTick = ts;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
       try {
         const codes = await detector.detect(video);
@@ -180,8 +184,10 @@ function _startQuaggaScanner() {
       target: document.getElementById('interactive'),
       constraints: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 }, height: { ideal: 720 }
-      }
+        width: { min: 640, ideal: 1280 },
+        height: { min: 480, ideal: 720 }
+      },
+      area: { top: '20%', right: '10%', left: '10%', bottom: '20%' }
     },
     numOfWorkers: 0,
     decoder: {
@@ -189,9 +195,27 @@ function _startQuaggaScanner() {
       multiple: false
     },
     locate: true,
-    frequency: 10
+    frequency: 5
   }, err => {
-    if (err) { showError('Camera error: ' + err.message); stopScanner(); return; }
+    if (err) {
+      // iOS Safari sometimes rejects constraints — retry bare minimum
+      Quagga.init({
+        inputStream: {
+          type: 'LiveStream',
+          target: document.getElementById('interactive'),
+          constraints: { facingMode: 'environment' }
+        },
+        numOfWorkers: 0,
+        decoder: { readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'] },
+        locate: true,
+        frequency: 5
+      }, err2 => {
+        if (err2) { showError('Camera error: ' + err2.message); stopScanner(); return; }
+        Quagga.start();
+        Quagga.onDetected(_onQuaggaDetected);
+      });
+      return;
+    }
     Quagga.start();
     Quagga.onDetected(_onQuaggaDetected);
   });
