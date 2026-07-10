@@ -5,33 +5,27 @@ let _resizeTimer = null;
 
 // ── Settings ───────────────────────────────────────────────────────────────
 const KEYS = {
-  usda:            'fs_usda_key',
-  nutritionixId:   'fs_nix_id',
-  nutritionixKey:  'fs_nix_key',
-  edamamId:        'fs_edamam_id',
-  edamamKey:       'fs_edamam_key',
-  spoonacular:     'fs_spoonacular_key',
+  usda:        'fs_usda_key',
+  edamamId:    'fs_edamam_id',
+  edamamKey:   'fs_edamam_key',
+  spoonacular: 'fs_spoonacular_key',
 };
 
 function getKeys() {
   return {
-    usda:           localStorage.getItem(KEYS.usda) || '',
-    nutritionixId:  localStorage.getItem(KEYS.nutritionixId) || '',
-    nutritionixKey: localStorage.getItem(KEYS.nutritionixKey) || '',
-    edamamId:       localStorage.getItem(KEYS.edamamId) || '',
-    edamamKey:      localStorage.getItem(KEYS.edamamKey) || '',
-    spoonacular:    localStorage.getItem(KEYS.spoonacular) || '',
+    usda:        localStorage.getItem(KEYS.usda) || '',
+    edamamId:    localStorage.getItem(KEYS.edamamId) || '',
+    edamamKey:   localStorage.getItem(KEYS.edamamKey) || '',
+    spoonacular: localStorage.getItem(KEYS.spoonacular) || '',
   };
 }
 
 function openSettings() {
   const k = getKeys();
-  document.getElementById('usda-key').value           = k.usda;
-  document.getElementById('nutritionix-app-id').value = k.nutritionixId;
-  document.getElementById('nutritionix-key').value    = k.nutritionixKey;
-  document.getElementById('edamam-app-id').value      = k.edamamId;
-  document.getElementById('edamam-key').value         = k.edamamKey;
-  document.getElementById('spoonacular-key').value    = k.spoonacular;
+  document.getElementById('usda-key').value        = k.usda;
+  document.getElementById('edamam-app-id').value   = k.edamamId;
+  document.getElementById('edamam-key').value      = k.edamamKey;
+  document.getElementById('spoonacular-key').value = k.spoonacular;
   updateStatusDots(k);
   document.getElementById('settings-backdrop').classList.remove('hidden');
   document.getElementById('settings-modal').classList.remove('hidden');
@@ -44,35 +38,30 @@ function closeSettings() {
 
 function saveSettings() {
   const k = {
-    usda:           document.getElementById('usda-key').value.trim(),
-    nutritionixId:  document.getElementById('nutritionix-app-id').value.trim(),
-    nutritionixKey: document.getElementById('nutritionix-key').value.trim(),
-    edamamId:       document.getElementById('edamam-app-id').value.trim(),
-    edamamKey:      document.getElementById('edamam-key').value.trim(),
-    spoonacular:    document.getElementById('spoonacular-key').value.trim(),
+    usda:        document.getElementById('usda-key').value.trim(),
+    edamamId:    document.getElementById('edamam-app-id').value.trim(),
+    edamamKey:   document.getElementById('edamam-key').value.trim(),
+    spoonacular: document.getElementById('spoonacular-key').value.trim(),
   };
-  localStorage.setItem(KEYS.usda,           k.usda);
-  localStorage.setItem(KEYS.nutritionixId,  k.nutritionixId);
-  localStorage.setItem(KEYS.nutritionixKey, k.nutritionixKey);
-  localStorage.setItem(KEYS.edamamId,       k.edamamId);
-  localStorage.setItem(KEYS.edamamKey,      k.edamamKey);
-  localStorage.setItem(KEYS.spoonacular,    k.spoonacular);
+  localStorage.setItem(KEYS.usda,        k.usda);
+  localStorage.setItem(KEYS.edamamId,    k.edamamId);
+  localStorage.setItem(KEYS.edamamKey,   k.edamamKey);
+  localStorage.setItem(KEYS.spoonacular, k.spoonacular);
   updateStatusDots(k);
   closeSettings();
 }
 
 function clearSettings() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k));
-  ['usda-key','nutritionix-app-id','nutritionix-key','edamam-app-id','edamam-key','spoonacular-key']
+  ['usda-key','edamam-app-id','edamam-key','spoonacular-key']
     .forEach(id => document.getElementById(id).value = '');
   updateStatusDots(getKeys());
 }
 
 function updateStatusDots(k) {
-  setDot('usda-status',         !!k.usda);
-  setDot('nutritionix-status',  !!(k.nutritionixId && k.nutritionixKey));
-  setDot('edamam-status',       !!(k.edamamId && k.edamamKey));
-  setDot('spoonacular-status',  !!k.spoonacular);
+  setDot('usda-status',        !!k.usda);
+  setDot('edamam-status',      !!(k.edamamId && k.edamamKey));
+  setDot('spoonacular-status', !!k.spoonacular);
 }
 
 function setDot(id, active) {
@@ -285,28 +274,15 @@ async function lookupBarcode(code) {
         } catch (_) {}
       }
 
-      const [usdaData, nixData, edamamData] = await Promise.allSettled([
-        keys.usda                                ? fetchUSDA(product, keys.usda)                                  : Promise.resolve(null),
-        keys.nutritionixId && keys.nutritionixKey ? fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey) : Promise.resolve(null),
-        keys.edamamId && keys.edamamKey          ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey)       : Promise.resolve(null),
+      const [usdaData, edamamData] = await Promise.allSettled([
+        keys.usda                       ? fetchUSDA(product, keys.usda)                              : Promise.resolve(null),
+        keys.edamamId && keys.edamamKey ? fetchEdamam(code, product, keys.edamamId, keys.edamamKey) : Promise.resolve(null),
       ]);
-      showResult(product, code, usdaData.value || null, nixData.value || null, edamamData.value || null);
+      showResult(product, code, usdaData.value || null, edamamData.value || null);
       return;
     }
 
-    // 2. Try Nutritionix UPC (if key set)
-    if (keys.nutritionixId && keys.nutritionixKey) {
-      try {
-        const nixFood = await fetchNutritionix(code, keys.nutritionixId, keys.nutritionixKey);
-        if (nixFood) {
-          const product = _nixToProduct(nixFood, code);
-          showResult(product, code, null, nixFood, null);
-          return;
-        }
-      } catch (_) {}
-    }
-
-    // 3. Try Spoonacular UPC (if key set)
+    // 2. Try Spoonacular UPC (if key set)
     if (keys.spoonacular) {
       try {
         const spoon = await fetchSpoonacular(code, keys.spoonacular);
@@ -326,27 +302,6 @@ async function lookupBarcode(code) {
   } finally {
     showLoading(false);
   }
-}
-
-function _nixToProduct(nix, code) {
-  return {
-    product_name:   nix.food_name || nix.brand_name || code,
-    brands:         nix.brand_name || '',
-    image_url:      nix.photo?.thumb || '',
-    serving_size:   nix.serving_unit ? `${nix.serving_qty} ${nix.serving_unit}` : '',
-    allergens_tags: [], additives_tags: [], labels_tags: [], countries_tags: [],
-    nutriments: {
-      'energy-kcal_100g':   nix.nf_calories,
-      'fat_100g':           nix.nf_total_fat,
-      'saturated-fat_100g': nix.nf_saturated_fat,
-      'carbohydrates_100g': nix.nf_total_carbohydrate,
-      'sugars_100g':        nix.nf_sugars,
-      'fiber_100g':         nix.nf_dietary_fiber,
-      'proteins_100g':      nix.nf_protein,
-      'sodium_100g':        (nix.nf_sodium || 0) / 1000,
-      'salt_100g':          (nix.nf_sodium || 0) * 2.5 / 1000,
-    }
-  };
 }
 
 function showNotFound(code) {
@@ -384,16 +339,6 @@ async function fetchUSDA(product, apiKey) {
   );
   const data = await res.json();
   return data.foods?.[0]?.foodNutrients || null;
-}
-
-// ── Nutritionix ────────────────────────────────────────────────────────────
-async function fetchNutritionix(barcode, appId, appKey) {
-  const res = await fetch(
-    `https://trackapi.nutritionix.com/v2/search/item?upc=${barcode}`,
-    { headers: { 'x-app-id': appId, 'x-app-key': appKey } }
-  );
-  const data = await res.json();
-  return data.foods?.[0] || null;
 }
 
 // ── Spoonacular ────────────────────────────────────────────────────────────
@@ -527,7 +472,7 @@ function calcGrade(product) {
 // ── Display Result ─────────────────────────────────────────────────────────
 let _currentProduct = null, _currentCode = null;
 
-function showResult(product, code, usdaNutrients, nixFood, edamamLabels) {
+function showResult(product, code, usdaNutrients, edamamLabels) {
   _currentProduct = product;
   _currentCode    = code;
 
@@ -567,7 +512,7 @@ function showResult(product, code, usdaNutrients, nixFood, edamamLabels) {
     : '<li class="none">No concerns found</li>';
 
   // Nutrients tab
-  buildMacros(product.nutriments || {}, nixFood);
+  buildMacros(product.nutriments || {});
   buildMicros(usdaNutrients);
   buildDietTags(edamamLabels);
 
@@ -579,7 +524,7 @@ function showResult(product, code, usdaNutrients, nixFood, edamamLabels) {
 }
 
 // ── Macros (Open Food Facts + Nutritionix fallback) ────────────────────────
-function buildMacros(n, nixFood) {
+function buildMacros(n) {
   const fields = [
     { key: 'energy-kcal_100g',   label: 'Energy',   unit: 'kcal', thresholds: [200, 400] },
     { key: 'fat_100g',           label: 'Fat',       unit: 'g',    thresholds: [5, 17.5] },
@@ -591,26 +536,11 @@ function buildMacros(n, nixFood) {
     { key: 'carbohydrates_100g', label: 'Carbs',     unit: 'g',    thresholds: [20, 40] },
   ];
 
-  const nixMap = nixFood ? {
-    'energy-kcal_100g':   nixFood.nf_calories,
-    'fat_100g':           nixFood.nf_total_fat,
-    'saturated-fat_100g': nixFood.nf_saturated_fat,
-    'sugars_100g':        nixFood.nf_sugars,
-    'proteins_100g':      nixFood.nf_protein,
-    'carbohydrates_100g': nixFood.nf_total_carbohydrate,
-    'fiber_100g':         nixFood.nf_dietary_fiber,
-  } : {};
-
   const grid = document.getElementById('ro-nutrients-grid');
   grid.innerHTML = '';
 
   fields.forEach(({ key, label, unit, thresholds, invert }) => {
-    let raw = n[key];
-    let fromNix = false;
-    if ((raw === undefined || raw === null) && nixMap[key] !== undefined) {
-      raw = nixMap[key];
-      fromNix = true;
-    }
+    const raw = n[key];
     if (raw === undefined || raw === null) return;
 
     const val = parseFloat(raw);
@@ -625,7 +555,7 @@ function buildMacros(n, nixFood) {
 
     const cell = document.createElement('div');
     cell.className = `nutrient-cell ${cls}`;
-    cell.innerHTML = `<div class="n-label">${label}${fromNix ? ' <sup>nix</sup>' : ''}</div><div class="n-value">${val.toFixed(1)}<small>${unit}</small></div>`;
+    cell.innerHTML = `<div class="n-label">${label}</div><div class="n-value">${val.toFixed(1)}<small>${unit}</small></div>`;
     grid.appendChild(cell);
   });
 
