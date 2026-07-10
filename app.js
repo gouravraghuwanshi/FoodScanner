@@ -340,6 +340,116 @@ async function searchByName() {
   }
 }
 
+// ── Label Scan (OCR fallback) ──────────────────────────────────────────────────
+let _labelStream = null;
+
+async function startLabelScan() {
+  hide('not-found-panel');
+  const panel = document.getElementById('label-scan-panel');
+  panel.classList.remove('hidden');
+  const video = document.getElementById('ls-video');
+  hide('ls-status');
+  try {
+    _labelStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = _labelStream;
+    await video.play();
+  } catch (err) {
+    stopLabelScan();
+    showError('Camera error: ' + err.message);
+  }
+}
+
+function stopLabelScan() {
+  if (_labelStream) { _labelStream.getTracks().forEach(t => t.stop()); _labelStream = null; }
+  hide('label-scan-panel');
+  show('not-found-panel');
+}
+
+async function captureLabel() {
+  const video  = document.getElementById('ls-video');
+  const canvas = document.getElementById('ls-canvas');
+  const status = document.getElementById('ls-status');
+  const btn    = document.getElementById('ls-capture-btn');
+
+  // Draw current video frame to canvas
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  btn.disabled = true;
+  status.className = 'ls-status-msg';
+  status.textContent = 'Reading label… this may take 10–20 seconds';
+  status.classList.remove('hidden');
+
+  try {
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
+      logger: m => { if (m.status === 'recognizing text') status.textContent = `Reading… ${Math.round(m.progress * 100)}%`; }
+    });
+
+    const nutrients = _parseNutritionText(text);
+    const found = Object.keys(nutrients).length >= 2;
+
+    if (!found) {
+      status.textContent = 'Could not read enough data. Try better lighting or a flatter angle.';
+      btn.disabled = false;
+      return;
+    }
+
+    stopLabelScan();
+    const product = {
+      product_name:   'Scanned Product (Label OCR)',
+      brands:         '',
+      image_url:      '',
+      nutriments:     nutrients,
+      allergens_tags: [], additives_tags: [], labels_tags: [], countries_tags: [],
+      _ocr:           true
+    };
+    showResult(product, lastCode || 'OCR', null, null);
+
+  } catch (e) {
+    status.textContent = 'OCR failed: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function _parseNutritionText(text) {
+  const n = {};
+  const t = text.replace(/\n/g, ' ');
+
+  // Each entry: [key, regex patterns to try]
+  const rules = [
+    ['energy-kcal_100g', [/(?:energy|calories?|kcal)[^\d]*(\d+(?:\.\d+)?)\s*kcal/i, /(?:energy|calories?)[^\d]*(\d+(?:\.\d+)?)/i]],
+    ['fat_100g',         [/total\s*fat[^\d]*(\d+(?:\.\d+)?)\s*g/i, /(?:^|\s)fat[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['saturated-fat_100g', [/saturated[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['carbohydrates_100g', [/(?:total\s*)?carbohydrate[s]?[^\d]*(\d+(?:\.\d+)?)\s*g/i, /carbs?[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['sugars_100g',      [/(?:total\s*)?sugars?[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['fiber_100g',       [/(?:dietary\s*)?fi[b]?[e]?r[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['proteins_100g',    [/proteins?[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['salt_100g',        [/salt[^\d]*(\d+(?:\.\d+)?)\s*g/i]],
+    ['sodium_100g',      [/sodium[^\d]*(\d+(?:\.\d+)?)\s*(?:mg|g)/i]],
+  ];
+
+  rules.forEach(([key, patterns]) => {
+    for (const re of patterns) {
+      const m = t.match(re);
+      if (m) {
+        let val = parseFloat(m[1]);
+        // sodium often in mg on Indian labels — convert to g
+        if (key === 'sodium_100g' && val > 10) val = val / 1000;
+        n[key] = val;
+        break;
+      }
+    }
+  });
+
+  // Derive salt from sodium if salt missing
+  if (!n['salt_100g'] && n['sodium_100g']) n['salt_100g'] = n['sodium_100g'] * 2.5;
+
+  return n;
+}
+
 // ── USDA FoodData Central ──────────────────────────────────────────────────
 async function fetchUSDA(product, apiKey) {
   const query = product.product_name || product.brands || '';
@@ -881,6 +991,8 @@ function showToast(msg) {
 function resetScanner() {
   hide('result-overlay');
   hide('not-found-panel');
+  if (_labelStream) { _labelStream.getTracks().forEach(t => t.stop()); _labelStream = null; }
+  hide('label-scan-panel');
   document.body.style.overflow = '';
   hideError();
   lastCode = null;
