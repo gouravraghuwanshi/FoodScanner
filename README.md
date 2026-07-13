@@ -8,14 +8,9 @@ Point your camera at any packaged food barcode. FoodScan looks it up instantly a
 
 - Nutritional grade (A–E) with Nutri-Score or calculated fallback
 - Full macro and micronutrient breakdown per 100g
-- Good / Bad analysis — fibre, protein, sugar, salt, additives, allergens
-- Macronutrient donut chart and nutrient vs daily reference bar chart
-- Eco-score, NOVA group, ingredients, diet tags
-- Downloadable PDF report
-
 ## Live Demo
 
-[https://foodscanner.netlify.app](https://foodscanner.netlify.app)
+[https://detoxfood.netlify.app](https://detoxfood.netlify.app)
 
 ## Tech Stack
 
