@@ -124,7 +124,9 @@
         <div id="ro-verdict-label">—</div>
         <div id="ro-verdict-sub">—</div>
       </div>
-      <div id="ro-grade">?</div>
+      <div id="ro-grade" role="button" tabindex="0" aria-label="Grade info" onclick="toggleGradePopover()" title="What does this grade mean?">?
+        <div id="grade-popover" class="hidden"></div>
+      </div>
       <div id="ro-actions">
         <button onclick="downloadReport()">Download Report</button>
         <button id="ro-close-btn" onclick="closeResult()">Close</button>

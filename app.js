@@ -794,6 +794,37 @@ function buildDetailsGrid(product) {
   });
 }
 
+// ── Grade Popover ───────────────────────────────────────────────────────────────────────────
+const GRADE_INFO = [
+  { grade: 'A', label: 'Excellent snack',   desc: 'Low in sugar, fat & salt. A genuinely healthy choice you can enjoy regularly.' },
+  { grade: 'B', label: 'Good snack',        desc: 'Decent nutritional profile. Fine to have often as part of a balanced diet.' },
+  { grade: 'C', label: 'Moderate',          desc: 'Some concerns — high in one or two areas. Enjoy occasionally, watch portions.' },
+  { grade: 'D', label: 'Poor snack',        desc: 'High in sugar, fat or salt. Best kept as a rare treat.' },
+  { grade: 'E', label: 'Avoid',             desc: 'Very poor nutritional profile. Heavily processed or extremely high in bad nutrients.' },
+];
+
+function toggleGradePopover() {
+  const popover = document.getElementById('grade-popover');
+  if (!popover.classList.contains('hidden')) {
+    popover.classList.add('hidden');
+    return;
+  }
+  const currentGrade = document.getElementById('ro-grade').textContent.trim().charAt(0);
+  popover.innerHTML = `<div class="gp-title">Snack Grade Guide</div>` +
+    GRADE_INFO.map(({ grade, label, desc }) => `
+      <div class="gp-row${grade === currentGrade ? ' gp-current' : ''}">
+        <span class="gp-badge grade-${grade}">${grade}</span>
+        <div class="gp-text"><strong>${label}</strong>${desc}</div>
+      </div>`).join('');
+  popover.classList.remove('hidden');
+}
+
+// Close popover when clicking outside
+document.addEventListener('click', e => {
+  if (!document.getElementById('ro-grade').contains(e.target))
+    document.getElementById('grade-popover').classList.add('hidden');
+});
+
 // ── Overlay Controls ───────────────────────────────────────────────────────
 function openResultOverlay(n) {
   document.getElementById('result-overlay').classList.remove('hidden');
@@ -999,6 +1030,7 @@ function showToast(msg) {
 function resetScanner() {
   hide('result-overlay');
   hide('not-found-panel');
+  document.getElementById('grade-popover').classList.add('hidden');
   document.body.style.overflow = '';
   hideError();
   lastCode = null;
