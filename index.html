@@ -14,7 +14,7 @@
     <div class="header-inner">
       <h1>FOOD<span>SCAN</span></h1>
       <p class="tagline">Point &mdash; Scan &mdash; Know</p>
-      <button id="settingsBtn" onclick="openSettings()">Settings</button>
+      <button id="settingsBtn" aria-label="Open settings" onclick="openSettings()">Settings</button>
     </div>
   </header>
 
@@ -34,6 +34,7 @@
           <button id="stopBtn" onclick="stopScanner()" disabled>Stop</button>
         </div>
         <div id="manual-row">
+          <label for="manualBarcode" class="sr-only">Enter barcode manually</label>
           <input type="text" id="manualBarcode" placeholder="Or enter barcode manually..." autocomplete="off" inputmode="numeric" />
           <button onclick="manualLookup()">Go</button>
         </div>
@@ -73,6 +74,7 @@
         <div class="nf-title">Product Not Found</div>
         <div class="nf-sub">Barcode <strong id="nf-barcode"></strong> isn't in any database we checked.</div>
         <div class="nf-search-row">
+          <label for="nf-search-input" class="sr-only">Search by product name</label>
           <input type="text" id="nf-search-input" placeholder="Type product name to search..." />
           <button onclick="searchByName()">Search</button>
         </div>
@@ -84,43 +86,20 @@
 
     </main>
 
-    <aside id="quotes-panel">
-      <div class="aside-label">On Food &amp; Health</div>
-      <!-- Desktop: horizontal scroll row -->
-      <div class="quotes-scroll">
-        <div class="quote-card"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
-        <div class="quote-card"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
-        <div class="quote-card"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
-        <div class="quote-card"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
-        <div class="quote-card"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
-        <div class="quote-card"><p>"Those who have no time for healthy eating will sooner or later have to find time for illness."</p><cite>Edward Stanley</cite></div>
+    <aside id="history-panel">
+      <div class="aside-header">
+        <span class="aside-label">Recent Scans</span>
+        <button id="clearHistoryBtn" aria-label="Clear history" onclick="clearHistory()">Clear</button>
       </div>
-      <!-- Mobile: stacked cards (same cards, shown via CSS) -->
-      <div class="quote-card mobile-only"><p>"Let food be thy medicine and medicine be thy food."</p><cite>Hippocrates</cite></div>
-      <div class="quote-card mobile-only"><p>"You are what you eat, so don't be fast, cheap, easy, or fake."</p><cite>Unknown</cite></div>
-      <div class="quote-card mobile-only"><p>"The food you eat can be either the safest form of medicine or the slowest form of poison."</p><cite>Ann Wigmore</cite></div>
-      <div class="quote-card mobile-only"><p>"Take care of your body. It's the only place you have to live."</p><cite>Jim Rohn</cite></div>
-      <div class="quote-card mobile-only"><p>"Eating well is a form of self-respect."</p><cite>Unknown</cite></div>
-      <div class="aside-label" style="margin-top:1.5rem">How to Read Grades</div>
-      <div class="grade-guide">
-        <div class="gg-row"><span class="gg-badge A">A</span><span>Excellent — eat freely</span></div>
-        <div class="gg-row"><span class="gg-badge B">B</span><span>Good — solid everyday choice</span></div>
-        <div class="gg-row"><span class="gg-badge C">C</span><span>Moderate — watch portions</span></div>
-        <div class="gg-row"><span class="gg-badge D">D</span><span>Poor — limit consumption</span></div>
-        <div class="gg-row"><span class="gg-badge E">E</span><span>Avoid — very poor profile</span></div>
-      </div>
+      <div id="history-empty" class="history-empty">No scans yet</div>
+      <ul id="history-list"></ul>
     </aside>
 
-    <!-- Desktop: grade guide as horizontal strip -->
-    <div class="grade-guide-strip">
-      <div class="aside-label">How to Read Grades</div>
-      <div class="grade-guide">
-        <div class="gg-row"><span class="gg-badge A">A</span><span>Excellent — eat freely</span></div>
-        <div class="gg-row"><span class="gg-badge B">B</span><span>Good — solid everyday choice</span></div>
-        <div class="gg-row"><span class="gg-badge C">C</span><span>Moderate — watch portions</span></div>
-        <div class="gg-row"><span class="gg-badge D">D</span><span>Poor — limit consumption</span></div>
-        <div class="gg-row"><span class="gg-badge E">E</span><span>Avoid — very poor profile</span></div>
-      </div>
+    <!-- Desktop: history as horizontal strip -->
+    <div id="history-strip">
+      <div class="aside-label">Recent Scans</div>
+      <div id="history-strip-list"></div>
+      <button id="clearHistoryStripBtn" aria-label="Clear history" onclick="clearHistory()">Clear</button>
     </div>
 
   </div>
@@ -218,7 +197,7 @@
   <div id="settings-modal" class="hidden">
     <div class="modal-header">
       <h2>API Settings</h2>
-      <button class="modal-close" onclick="closeSettings()">X</button>
+      <button class="modal-close" aria-label="Close settings" onclick="closeSettings()">&times;</button>
     </div>
     <p class="modal-intro">Keys are saved in your browser only. Each unlocks richer data when scanning.</p>
     <div class="api-row">
@@ -229,6 +208,7 @@
       </div>
       <div class="api-input-row">
         <span id="usda-status" class="api-status"></span>
+        <label for="usda-key" class="sr-only">USDA API key</label>
         <input type="password" id="usda-key" placeholder="Paste USDA API key..." />
       </div>
     </div>
@@ -240,7 +220,9 @@
       </div>
       <div class="api-input-row">
         <span id="edamam-status" class="api-status"></span>
+        <label for="edamam-app-id" class="sr-only">Edamam App ID</label>
         <input type="password" id="edamam-app-id" placeholder="App ID..." />
+        <label for="edamam-key" class="sr-only">Edamam App Key</label>
         <input type="password" id="edamam-key" placeholder="App Key..." />
       </div>
     </div>
@@ -252,6 +234,7 @@
       </div>
       <div class="api-input-row">
         <span id="spoonacular-status" class="api-status"></span>
+        <label for="spoonacular-key" class="sr-only">Spoonacular API key</label>
         <input type="password" id="spoonacular-key" placeholder="Paste Spoonacular API key..." />
       </div>
     </div>

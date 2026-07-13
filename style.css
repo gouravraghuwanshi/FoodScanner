@@ -207,49 +207,53 @@ main {
     line-height: 1.6;
   }
 
-  /* Quotes strip — horizontal scrolling row */
-  #quotes-panel {
+  /* History strip — horizontal scrolling row */
+  #history-panel {
     position: static;
     max-height: none;
     overflow: visible;
     padding: 0;
-    display: block;
+    display: none;
+  }
+
+  #history-strip {
+    display: flex;
+    align-items: stretch;
     border-bottom: var(--border);
-  }
-
-  .aside-label {
-    font-size: 0.6rem;
-    letter-spacing: 3px;
-    padding: 0.9rem 2rem 0.7rem;
-    border-bottom: var(--border);
-    border-right: none;
-  }
-
-  .quotes-scroll {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    border-top: none;
-  }
-
-  .quote-card {
-    border: none;
-    border-right: var(--border);
-    box-shadow: none;
-    padding: 1.2rem 1.5rem;
     background: var(--surface);
+    min-height: 72px;
   }
 
-  .quote-card:last-child { border-right: none; }
-
-  .quote-card p {
-    font-size: 0.8rem;
-    line-height: 1.55;
+  #history-strip .aside-label {
+    border-bottom: none;
+    border-right: var(--border);
+    padding: 0.9rem 1.5rem;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
-  .quote-card cite {
-    font-size: 0.62rem;
-    margin-top: 0.6rem;
+  #history-strip-list {
+    display: flex;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+  #history-strip-list::-webkit-scrollbar { display: none; }
+
+  #clearHistoryStripBtn {
+    font-size: 0.65rem;
+    padding: 0.5rem 1rem;
+    letter-spacing: 1px;
+    border: none;
+    border-left: var(--border);
+    box-shadow: none;
+    background: var(--bg);
+    flex-shrink: 0;
+    align-self: stretch;
+  }
+  #clearHistoryStripBtn:hover { background: #e8e4de; transform: none; box-shadow: none; }
 
   /* Grade guide — horizontal strip */
   .grade-guide-strip {
@@ -286,9 +290,9 @@ main {
 
   .grade-guide-strip .gg-row:last-child { border-right: none; }
 
-  /* Hide the old stacked aside labels/grade guide inside quotes-panel */
-  #quotes-panel > .aside-label:last-of-type,
-  #quotes-panel > .grade-guide { display: none; }
+  /* Hide the old stacked aside labels/grade guide inside history-panel on desktop */
+  #history-panel > .aside-label,
+  #history-panel > .grade-guide { display: none; }
 
   /* Loading / error stay in the centred column */
   #loading, #error-box {
@@ -698,53 +702,155 @@ button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shado
 
 #error-box button { background: var(--ink); color: var(--bg); }
 
-/* ── Aside / Quotes Panel ── */
-#quotes-panel {
-  padding: 1.8rem 1.5rem 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
-  overflow-y: auto;
-}
-
 .aside-label {
   font-family: 'Arial Black', Arial, sans-serif;
   font-size: 0.65rem;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--ink-light);
+}
+
+/* ── Aside / History Panel (mobile) ── */
+#history-panel {
+  padding: 1.2rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  border-left: var(--border);
+}
+
+.aside-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding-bottom: 0.5rem;
   border-bottom: var(--border);
 }
 
-.quote-card {
+#clearHistoryBtn {
+  font-size: 0.62rem;
+  padding: 0.25rem 0.6rem;
+  letter-spacing: 1px;
+  box-shadow: 2px 2px 0 var(--border-col);
+  background: var(--bg);
+}
+#clearHistoryBtn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--border-col); }
+
+.history-empty {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.75rem;
+  color: var(--ink-light);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+#history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
   border: var(--border);
   box-shadow: var(--shadow);
   background: var(--surface);
-  padding: 0.9rem 1rem;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.history-item:hover { transform: translate(-2px,-2px); box-shadow: var(--shadow-lg); }
+
+.history-item img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border: 1px solid #d8d3cc;
+  background: #fff;
+  flex-shrink: 0;
 }
 
-.quote-card p {
-  font-family: 'Georgia', serif;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  font-style: italic;
-  color: var(--ink);
+.hi-grade {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #fff;
+  flex-shrink: 0;
 }
+.hi-grade.grade-A { background: var(--grade-a); }
+.hi-grade.grade-B { background: var(--grade-b); }
+.hi-grade.grade-C { background: var(--grade-c); }
+.hi-grade.grade-D { background: var(--grade-d); }
+.hi-grade.grade-E { background: var(--grade-e); }
+.hi-grade.grade-unknown { background: #999; }
 
-.quote-card cite {
-  display: block;
-  margin-top: 0.5rem;
-  font-family: 'Arial', sans-serif;
-  font-size: 0.68rem;
-  letter-spacing: 1px;
+.hi-info { flex: 1; min-width: 0; }
+.hi-name {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
   text-transform: uppercase;
-  color: var(--ink-light);
-  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.hi-meta {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.62rem;
+  color: var(--ink-light);
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+
+/* Desktop history strip items */
+.history-strip-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.6rem 1rem;
+  border-right: var(--border);
+  cursor: pointer;
+  min-width: 140px;
+  background: var(--surface);
+  transition: background 0.1s;
+  flex-shrink: 0;
+}
+.history-strip-item:hover { background: var(--bg); }
+
+.history-strip-item .hi-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.history-strip-item .hi-name {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.history-strip-item .hi-meta {
+  font-size: 0.6rem;
+}
+
+#history-strip { display: none; }
 
 /* ── Grade Guide ── */
 .grade-guide {
@@ -1127,20 +1233,24 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
 
 /* ── Utility ── */
 .hidden { display: none !important; }
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Desktop-only elements: hidden by default, shown via min-width media query */
 #how-it-works    { display: none; }
 .grade-guide-strip { display: none; }
-.quotes-scroll   { display: none; }
-
-/* Mobile-only elements: shown by default, hidden on desktop */
-.mobile-only { display: block; }
 
 @media (min-width: 900px) {
   #how-it-works      { display: grid; }
   .grade-guide-strip { display: flex; }
-  .quotes-scroll     { display: grid; }
-  .mobile-only       { display: none; }
+  #history-strip     { display: flex; }
 }
 
 @keyframes fadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -1159,23 +1269,23 @@ footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid va
     border-bottom: var(--border);
     padding: 1.4rem;
   }
-  #quotes-panel {
+  #history-panel {
     position: static;
     max-height: none;
-    padding: 1.4rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1rem;
+    padding: 1.2rem 1.4rem;
+    border-left: none;
     border-bottom: var(--border);
   }
-  .aside-label { grid-column: 1 / -1; }
-  .grade-guide { grid-column: 1 / -1; }
+  #history-list { flex-direction: row; flex-wrap: wrap; }
+  .history-item { width: calc(50% - 0.25rem); }
 }
 
 @media (max-width: 520px) {
   .header-inner { flex-direction: column; gap: 0.3rem; padding: 1rem; }
   main { padding: 1rem; }
-  #quotes-panel { padding: 1rem; grid-template-columns: 1fr; }
+  #history-panel { padding: 1rem; }
+  #history-list { flex-direction: column; }
+  .history-item { width: 100%; }
   #result-header { flex-direction: column; align-items: flex-start; }
   .btn-row { flex-direction: column; }
   footer p { padding: 1rem; }

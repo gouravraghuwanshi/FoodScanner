@@ -75,7 +75,6 @@ let _stream  = null;
 let _raf     = null;
 let _zxing   = null;
 
-const _isMobile  = /Mobi|Android/i.test(navigator.userAgent);
 const _isAndroid = /Android/i.test(navigator.userAgent);
 const _isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -389,24 +388,125 @@ async function fetchEdamam(barcode, product, appId, appKey) {
   return data.hints?.[0]?.food?.healthLabels || null;
 }
 
+// ── History ───────────────────────────────────────────────────────────────────────────
+const HISTORY_KEY = 'fs_history';
+const HISTORY_MAX = 20;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch (_) { return []; }
+}
+
+function saveToHistory(product, code, grade) {
+  const entry = {
+    code,
+    name:    product.product_name || product.product_name_en || 'Unknown',
+    brand:   product.brands || '',
+    image:   product.image_front_small_url || product.image_url || '',
+    grade,
+    scannedAt: Date.now(),
+    // Store minimal nutriments + meta needed to re-render the result
+    product: {
+      product_name:          product.product_name,
+      product_name_en:       product.product_name_en,
+      brands:                product.brands,
+      image_front_small_url: product.image_front_small_url,
+      image_url:             product.image_url,
+      nutriments:            product.nutriments,
+      nutriscore_grade:      product.nutriscore_grade,
+      nova_group:            product.nova_group,
+      ecoscore_grade:        product.ecoscore_grade,
+      additives_tags:        product.additives_tags,
+      allergens_tags:        product.allergens_tags,
+      labels_tags:           product.labels_tags,
+      countries_tags:        product.countries_tags,
+      ingredients_text:      product.ingredients_text,
+      serving_size:          product.serving_size,
+    },
+  };
+  const history = loadHistory().filter(h => h.code !== code); // dedupe
+  history.unshift(entry);
+  if (history.length > HISTORY_MAX) history.length = HISTORY_MAX;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  const isEmpty = history.length === 0;
+
+  // Mobile sidebar
+  document.getElementById('history-empty').classList.toggle('hidden', !isEmpty);
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  history.forEach(h => list.appendChild(_makeHistoryItem(h, false)));
+
+  // Desktop strip
+  const strip = document.getElementById('history-strip-list');
+  strip.innerHTML = '';
+  if (isEmpty) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'display:flex;align-items:center;padding:0 1.5rem;font-family:Arial,sans-serif;font-size:0.75rem;color:var(--ink-light);font-style:italic;';
+    empty.textContent = 'No scans yet';
+    strip.appendChild(empty);
+  } else {
+    history.forEach(h => strip.appendChild(_makeHistoryItem(h, true)));
+  }
+}
+
+function _makeHistoryItem(h, isStrip) {
+  const gradeClass = ['A','B','C','D','E'].includes(h.grade) ? 'grade-' + h.grade : 'grade-unknown';
+  const date = new Date(h.scannedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  if (isStrip) {
+    const el = document.createElement('div');
+    el.className = 'history-strip-item';
+    el.innerHTML = `
+      <div class="hi-row">
+        <span class="hi-grade ${gradeClass}">${h.grade}</span>
+        <span class="hi-name">${sanitise(h.name)}</span>
+      </div>
+      <div class="hi-meta">${sanitise(h.brand || h.code)} &middot; ${date}</div>`;
+    el.addEventListener('click', () => showResult(h.product, h.code, null, null));
+    return el;
+  }
+
+  const li = document.createElement('li');
+  li.className = 'history-item';
+  li.innerHTML = `
+    <img src="${sanitise(h.image)}" alt="" onerror="this.style.display='none'" />
+    <span class="hi-grade ${gradeClass}">${h.grade}</span>
+    <div class="hi-info">
+      <div class="hi-name">${sanitise(h.name)}</div>
+      <div class="hi-meta">${sanitise(h.brand || h.code)} &middot; ${date}</div>
+    </div>`;
+  li.addEventListener('click', () => showResult(h.product, h.code, null, null));
+  return li;
+}
+
 // ── Rating & Breakdown Engine ─────────────────────────────────────────────
-// Each check returns { label, type: 'good'|'bad'|null }
+// Thresholds are snack-calibrated (per 100g of a typical ~30–50g snack portion)
 function analyseNutrients(product) {
   const n   = product.nutriments || {};
   const per = v => (v !== undefined && v !== null) ? parseFloat(v) : null;
 
   const checks = [
     // ── Bad things (high = bad) ──
-    { val: per(n['saturated-fat_100g']), label: 'High saturated fat',  bad: 5,   good: 1.5,  invert: false },
-    { val: per(n['sugars_100g']),        label: 'High sugar',           bad: 22.5, good: 5,   invert: false },
-    { val: per(n['salt_100g']),          label: 'High salt',            bad: 1.5,  good: 0.3, invert: false },
-    { val: per(n['fat_100g']),           label: 'High total fat',       bad: 17.5, good: 5,   invert: false },
-    { val: per(n['energy-kcal_100g']),   label: 'High calories',        bad: 400,  good: 200, invert: false },
+    { val: per(n['saturated-fat_100g']), label: 'High saturated fat',    bad: 8,   good: 2.5, invert: false },
+    { val: per(n['sugars_100g']),        label: 'High sugar',             bad: 30,  good: 8,   invert: false },
+    { val: per(n['salt_100g']),          label: 'High salt',              bad: 2.0, good: 0.5, invert: false },
+    { val: per(n['fat_100g']),           label: 'High total fat',         bad: 25,  good: 8,   invert: false },
+    { val: per(n['energy-kcal_100g']),   label: 'High calories',          bad: 500, good: 250, invert: false },
     // ── Good things (high = good) ──
-    { val: per(n['fiber_100g']),         label: 'Good source of fibre', bad: 1.5,  good: 3,   invert: true  },
-    { val: per(n['proteins_100g']),      label: 'Good source of protein', bad: 2,  good: 5,   invert: true  },
+    { val: per(n['fiber_100g']),         label: 'Good source of fibre',   bad: 1.5, good: 3,   invert: true  },
+    { val: per(n['proteins_100g']),      label: 'Good source of protein', bad: 2,   good: 5,   invert: true  },
     // ── Additives / NOVA ──
-    { val: per(product.nova_group),      label: 'Ultra-processed (NOVA 4)', bad: 4, good: 2,  invert: false, integer: true },
+    { val: per(product.nova_group),      label: 'Ultra-processed (NOVA 4)', bad: 4, good: 2,   invert: false, integer: true },
   ];
 
   const good = [], bad = [], neutral = [];
@@ -467,12 +567,13 @@ function calcGrade(product) {
     .some(k => per(n[k]) > 0);
   if (!hasData) return { grade: '?', source: 'No data' };
 
+  // Snack-calibrated ceilings per 100g (a 40g portion = ~half these values)
   let penalty = 0;
-  penalty += Math.min(per(n['energy-kcal_100g'])    / 900, 1) * 30;
-  penalty += Math.min(per(n['saturated-fat_100g'])  / 10,  1) * 25;
-  penalty += Math.min(per(n['sugars_100g'])          / 45,  1) * 25;
-  penalty += Math.min((per(n['sodium_100g']) * 1000) / 600, 1) * 20;
-  const bonus = Math.min(per(n['fiber_100g'])   / 6, 1) * 10
+  penalty += Math.min(per(n['energy-kcal_100g'])    / 550, 1) * 30;  // 550 kcal/100g = very calorie-dense snack
+  penalty += Math.min(per(n['saturated-fat_100g'])  / 10,  1) * 25;  // 10g/100g = very high sat fat
+  penalty += Math.min(per(n['sugars_100g'])          / 40,  1) * 25;  // 40g/100g = candy-level sugar
+  penalty += Math.min((per(n['sodium_100g']) * 1000) / 500, 1) * 20;  // 500mg/100g = very salty snack
+  const bonus = Math.min(per(n['fiber_100g'])   / 5, 1) * 10
               + Math.min(per(n['proteins_100g']) / 8, 1) * 10;
   const score = Math.max(0, Math.round(penalty - bonus));
   const grade = score <= 15 ? 'A' : score <= 30 ? 'B' : score <= 50 ? 'C' : score <= 70 ? 'D' : 'E';
@@ -494,24 +595,22 @@ function showResult(product, code, usdaNutrients, edamamLabels) {
   document.getElementById('ro-brand').textContent   = product.brands || '—';
   document.getElementById('ro-barcode').textContent = code;
 
-  // Verdict
-  const analysis = analyseNutrients(product);
-  const vb = document.getElementById('ro-verdict-block');
-  vb.className = 'verdict-block ' + analysis.cls;
-  document.getElementById('ro-verdict-label').textContent = analysis.verdict;
-  document.getElementById('ro-verdict-sub').textContent   = analysis.sub;
-
   // Grade
   const { grade, source } = calcGrade(product);
   const gb = document.getElementById('ro-grade');
   gb.textContent = grade;
   gb.className   = grade === '?' ? 'grade-unknown' : 'grade-' + grade;
 
-  // If no nutrient data, show warning and skip charts/stats
+  // Verdict
   const noData = grade === '?';
+  const analysis = analyseNutrients(product);
+  const vb = document.getElementById('ro-verdict-block');
+  vb.className = 'verdict-block ' + (noData ? 'verdict-neutral' : analysis.cls);
   document.getElementById('ro-verdict-label').textContent = noData ? 'No Nutrient Data' : analysis.verdict;
   document.getElementById('ro-verdict-sub').textContent   = noData ? 'This product exists in the database but nutritional values have not been filled in yet.' : analysis.sub;
-  if (noData) vb.className = 'verdict-block verdict-neutral';
+
+  // Save to history
+  if (grade !== '?') saveToHistory(product, code, grade);
 
   // Good / Bad lists
   document.getElementById('ro-good-list').innerHTML = analysis.good.length
@@ -536,14 +635,15 @@ function showResult(product, code, usdaNutrients, edamamLabels) {
 // ── Macros (Open Food Facts + Nutritionix fallback) ────────────────────────
 function buildMacros(n) {
   const fields = [
-    { key: 'energy-kcal_100g',   label: 'Energy',   unit: 'kcal', thresholds: [200, 400] },
-    { key: 'fat_100g',           label: 'Fat',       unit: 'g',    thresholds: [5, 17.5] },
-    { key: 'saturated-fat_100g', label: 'Sat. Fat',  unit: 'g',    thresholds: [1.5, 5] },
-    { key: 'sugars_100g',        label: 'Sugars',    unit: 'g',    thresholds: [5, 22.5] },
-    { key: 'salt_100g',          label: 'Salt',      unit: 'g',    thresholds: [0.3, 1.5] },
-    { key: 'fiber_100g',         label: 'Fiber',     unit: 'g',    thresholds: [3, 6],   invert: true },
-    { key: 'proteins_100g',      label: 'Protein',   unit: 'g',    thresholds: [5, 10],  invert: true },
-    { key: 'carbohydrates_100g', label: 'Carbs',     unit: 'g',    thresholds: [20, 40] },
+    // Snack-calibrated colour thresholds (per 100g)
+    { key: 'energy-kcal_100g',   label: 'Energy',   unit: 'kcal', thresholds: [250, 500] },
+    { key: 'fat_100g',           label: 'Fat',       unit: 'g',    thresholds: [8,  25]  },
+    { key: 'saturated-fat_100g', label: 'Sat. Fat',  unit: 'g',    thresholds: [2.5, 8]  },
+    { key: 'sugars_100g',        label: 'Sugars',    unit: 'g',    thresholds: [8,  30]  },
+    { key: 'salt_100g',          label: 'Salt',      unit: 'g',    thresholds: [0.5, 2.0]},
+    { key: 'fiber_100g',         label: 'Fiber',     unit: 'g',    thresholds: [3,   5],  invert: true },
+    { key: 'proteins_100g',      label: 'Protein',   unit: 'g',    thresholds: [5,   8],  invert: true },
+    { key: 'carbohydrates_100g', label: 'Carbs',     unit: 'g',    thresholds: [25, 50]  },
   ];
 
   const grid = document.getElementById('ro-nutrients-grid');
@@ -629,30 +729,45 @@ function buildDietTags(labels) {
 }
 
 // ── Overview Stats ─────────────────────────────────────────────────────────
+// Snack allowance refs: budget for a single snack (~40g portion, ~10% of daily intake)
+const SNACK_REFS = {
+  'energy-kcal_100g': 200,  // ~80 kcal in a 40g snack
+  'proteins_100g':      5,  // ~2g protein in a 40g snack
+  'fat_100g':           7,  // ~2.8g fat in a 40g snack
+  'sugars_100g':        9,  // ~3.6g sugar in a 40g snack
+};
+
 function buildOverviewStats(n) {
   const stats = [
-    { label: 'Calories', key: 'energy-kcal_100g', unit: 'kcal', ref: 2000, color: '#b06030' },
-    { label: 'Protein',  key: 'proteins_100g',    unit: 'g',    ref: 50,   color: '#3d6b4f' },
-    { label: 'Fat',      key: 'fat_100g',          unit: 'g',    ref: 70,   color: '#8f3030' },
-    { label: 'Sugar',    key: 'sugars_100g',       unit: 'g',    ref: 90,   color: '#a08c3a' },
+    { label: 'Calories', key: 'energy-kcal_100g', unit: 'kcal', color: '#b06030' },
+    { label: 'Protein',  key: 'proteins_100g',    unit: 'g',    color: '#3d6b4f' },
+    { label: 'Fat',      key: 'fat_100g',          unit: 'g',    color: '#8f3030' },
+    { label: 'Sugar',    key: 'sugars_100g',       unit: 'g',    color: '#a08c3a' },
   ];
   const container = document.getElementById('overview-stats');
   container.innerHTML = '';
-  stats.forEach(({ label, key, unit, ref, color }) => {
+  stats.forEach(({ label, key, unit, color }) => {
     const val = parseFloat(n[key]) || 0;
+    const ref = SNACK_REFS[key];
     const pct = Math.min(val / ref * 100, 100).toFixed(0);
     const box = document.createElement('div');
     box.className = 'stat-box';
     box.innerHTML = `
       <div class="stat-label">${label}</div>
       <div class="stat-value">${val % 1 === 0 ? val : val.toFixed(1)}</div>
-      <div class="stat-unit">${unit} per 100g &nbsp;·&nbsp; ${pct}% daily ref</div>
+      <div class="stat-unit">${unit} per 100g &nbsp;·&nbsp; ${pct}% snack ref</div>
       <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
     container.appendChild(box);
   });
 }
 
 // ── Details Grid ───────────────────────────────────────────────────────────
+function sanitise(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
 function buildDetailsGrid(product) {
   const grid = document.getElementById('ro-details-grid');
   grid.innerHTML = '';
@@ -674,7 +789,7 @@ function buildDetailsGrid(product) {
   items.forEach(({ title, body }) => {
     const card = document.createElement('div');
     card.className = 'detail-card';
-    card.innerHTML = `<div class="detail-card-title">${title}</div><div class="detail-card-body">${body}</div>`;
+    card.innerHTML = `<div class="detail-card-title">${sanitise(title)}</div><div class="detail-card-body">${sanitise(body)}</div>`;
     grid.appendChild(card);
   });
 }
@@ -689,8 +804,6 @@ function openResultOverlay(n) {
 }
 
 function closeResult() {
-  document.getElementById('result-overlay').classList.add('hidden');
-  document.body.style.overflow = '';
   resetScanner();
 }
 
@@ -754,13 +867,14 @@ function drawBarsChart(n) {
   if (!canvas) return;
 
   const bars = [
-    { label: 'Energy',  val: parseFloat(n['energy-kcal_100g'])   || 0, ref: 2000, invert: false },
-    { label: 'Fat',     val: parseFloat(n['fat_100g'])            || 0, ref: 70,   invert: false },
-    { label: 'Sat Fat', val: parseFloat(n['saturated-fat_100g']) || 0, ref: 20,   invert: false },
-    { label: 'Sugar',   val: parseFloat(n['sugars_100g'])         || 0, ref: 90,   invert: false },
-    { label: 'Salt',    val: parseFloat(n['salt_100g'])           || 0, ref: 6,    invert: false },
-    { label: 'Fibre',   val: parseFloat(n['fiber_100g'])          || 0, ref: 25,   invert: true  },
-    { label: 'Protein', val: parseFloat(n['proteins_100g'])       || 0, ref: 50,   invert: true  },
+    // Snack-calibrated refs for the bar chart (per 100g)
+    { label: 'Energy',  val: parseFloat(n['energy-kcal_100g'])   || 0, ref: 550, invert: false },
+    { label: 'Fat',     val: parseFloat(n['fat_100g'])            || 0, ref: 25,  invert: false },
+    { label: 'Sat Fat', val: parseFloat(n['saturated-fat_100g']) || 0, ref: 10,  invert: false },
+    { label: 'Sugar',   val: parseFloat(n['sugars_100g'])         || 0, ref: 40,  invert: false },
+    { label: 'Salt',    val: parseFloat(n['salt_100g'])           || 0, ref: 2,   invert: false },
+    { label: 'Fibre',   val: parseFloat(n['fiber_100g'])          || 0, ref: 5,   invert: true  },
+    { label: 'Protein', val: parseFloat(n['proteins_100g'])       || 0, ref: 8,   invert: true  },
   ];
 
   const dpr      = window.devicePixelRatio || 1;
@@ -792,7 +906,7 @@ function drawBarsChart(n) {
     ctx.fillRect(padL, y + 8, barW * pct, 10);
     // Label
     ctx.fillStyle = '#6b6560';
-    ctx.font = `${10 * dpr / dpr}px Arial`;
+    ctx.font = '10px Arial';
     ctx.textAlign = 'right';
     ctx.fillText(b.label, padL - 4, y + 17);
     // Pct text
@@ -812,6 +926,8 @@ function downloadReport() {
   const n        = p.nutriments || {};
   const gradeColors = { A:'#3d6b4f', B:'#6a8f5e', C:'#a08c3a', D:'#b06030', E:'#8f3030' };
 
+  const esc = s => sanitise(String(s ?? ''));
+
   const nutrientRows = [
     ['Energy',   n['energy-kcal_100g'], 'kcal'],
     ['Fat',      n['fat_100g'],         'g'],
@@ -826,7 +942,7 @@ function downloadReport() {
    .join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>FoodScan Report — ${p.product_name || code}</title>
+<title>FoodScan Report — ${esc(p.product_name || code)}</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; color: #1c1c1c; background: #f2efe9; }
   h1   { font-family: 'Arial Black', Arial, sans-serif; font-size: 1.4rem; text-transform: uppercase; border-bottom: 3px solid #1c1c1c; padding-bottom: 8px; }
@@ -841,21 +957,23 @@ function downloadReport() {
   @media print { body { background: #fff; } }
 </style></head><body>
 <h1>FoodScan Report</h1>
-<div class="meta">${p.product_name || 'Unknown'} &nbsp;|&nbsp; ${p.brands || ''} &nbsp;|&nbsp; Barcode: ${code}</div>
-<span class="grade">${grade}</span><span class="verdict">${analysis.verdict}</span>
-<p style="font-size:0.82rem;color:#6b6560;margin-top:8px">${analysis.sub}</p>
+<div class="meta">${esc(p.product_name || 'Unknown')} &nbsp;|&nbsp; ${esc(p.brands || '')} &nbsp;|&nbsp; Barcode: ${esc(code)}</div>
+<span class="grade">${grade}</span><span class="verdict">${esc(analysis.verdict)}</span>
+<p style="font-size:0.82rem;color:#6b6560;margin-top:8px">${esc(analysis.sub)}</p>
 <h2>Nutrients per 100g</h2><table>${nutrientRows}</table>
-<h2>Positives</h2><ul class="good">${analysis.good.map(t=>`<li>${t}</li>`).join('') || '<li>Nothing notable</li>'}</ul>
-<h2>Concerns</h2><ul class="bad">${analysis.bad.map(t=>`<li>${t}</li>`).join('') || '<li>No concerns found</li>'}</ul>
-<h2>Ingredients</h2><p style="font-size:0.82rem;line-height:1.6">${p.ingredients_text || '—'}</p>
+<h2>Positives</h2><ul class="good">${analysis.good.map(t=>`<li>${esc(t)}</li>`).join('') || '<li>Nothing notable</li>'}</ul>
+<h2>Concerns</h2><ul class="bad">${analysis.bad.map(t=>`<li>${esc(t)}</li>`).join('') || '<li>No concerns found</li>'}</ul>
+<h2>Ingredients</h2><p style="font-size:0.82rem;line-height:1.6">${esc(p.ingredients_text || '—')}</p>
 <p style="font-size:0.7rem;color:#999;margin-top:2rem">Generated by FoodScan &nbsp;·&nbsp; Data: Open Food Facts</p>
 </body></html>`;
 
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, target: '_blank' });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // ── UI Helpers ─────────────────────────────────────────────────────────────
@@ -885,11 +1003,11 @@ function resetScanner() {
   hideError();
   lastCode = null;
   document.getElementById('manualBarcode').value = '';
-  show('scanner-section');
 }
 
 // Init
 updateStatusDots(getKeys());
+renderHistory();
 
 if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
   showError('Camera requires HTTPS. Please use the secure version of this site.');
@@ -907,9 +1025,19 @@ document.addEventListener('keydown', e => {
 window.addEventListener('resize', () => {
   clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
-    if (_currentProduct && !document.getElementById('result-overlay').classList.contains('hidden')) {
-      drawMacroDonut(_currentProduct.nutriments || {});
-      drawBarsChart(_currentProduct.nutriments || {});
-    }
+    if (!_currentProduct) return;
+    if (document.getElementById('result-overlay').classList.contains('hidden')) return;
+    const n = _currentProduct.nutriments || {};
+    drawMacroDonut(n);
+    drawBarsChart(n);
   }, 200);
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.getAttribute('onclick')?.match(/switchTab\('(\w+)'\)/)?.[1];
+    if (name === 'overview' && _currentProduct) {
+      requestAnimationFrame(() => drawBarsChart(_currentProduct.nutriments || {}));
+    }
+  });
 });
