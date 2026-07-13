@@ -598,8 +598,9 @@ function showResult(product, code, usdaNutrients, edamamLabels) {
   // Grade
   const { grade, source } = calcGrade(product);
   const gb = document.getElementById('ro-grade');
-  gb.textContent = grade;
-  gb.className   = grade === '?' ? 'grade-unknown' : 'grade-' + grade;
+  document.getElementById('grade-popover').classList.add('hidden');
+  gb.childNodes[0].textContent = grade;
+  gb.className = grade === '?' ? 'grade-unknown' : 'grade-' + grade;
 
   // Verdict
   const noData = grade === '?';
@@ -831,7 +832,7 @@ function openResultOverlay(n) {
   document.body.style.overflow = 'hidden';
   switchTab('overview');
   requestAnimationFrame(() => { drawMacroDonut(n); drawBarsChart(n); });
-  showToast('Product found');
+  setTimeout(() => showToast('Product found'), 350);
 }
 
 function closeResult() {
