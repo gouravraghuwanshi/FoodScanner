@@ -883,19 +883,24 @@ function drawMacroDonut(n) {
     deg += span;
   });
 
+  const kcal = parseFloat(n['energy-kcal_100g']) || 0;
+  const holeHTML = total
+    ? `<span class="donut-total">${kcal > 0 ? Math.round(kcal) : Math.round(total * 4)}</span><span class="donut-sub">kcal</span>`
+    : `<span class="donut-sub" style="font-size:0.55rem">No data</span>`;
+
   const card = document.getElementById('chart-macro').closest('.chart-card');
   card.innerHTML = `
     <div class="chart-title">Macronutrient Split</div>
     <div class="donut-wrap">
       <div class="donut-ring" style="background:conic-gradient(${stops.join(',')})">
-        <div class="donut-hole"></div>
+        <div class="donut-hole">${holeHTML}</div>
       </div>
     </div>
     <div class="chart-legend" id="chart-macro-legend">
       ${segments.map(s => `
         <span class="legend-item">
           <span class="legend-dot" style="background:${s.color};border:2px solid #1c1c1c"></span>
-          <span>${s.label}<br><strong>${total ? ((s.val / sum) * 100).toFixed(0) : 0}%</strong></span>
+          <span>${s.label}<br><strong>${total ? ((s.val / sum) * 100).toFixed(0) + '%' : '—'}</strong></span>
         </span>`).join('')}
     </div>`;
 }
@@ -916,13 +921,15 @@ function drawBarsChart(n) {
     { label: 'Protein', val: parseFloat(n['proteins_100g'])       || 0, ref: 8,   invert: true  },
   ];
 
-  const dpr      = window.devicePixelRatio || 1;
-  const cssW     = canvas.offsetWidth  || 300;
-  const rowH     = 28;
-  const padL     = 58, padR = 12, padT = 10, padB = 10;
-  const cssH     = bars.length * rowH + padT + padB;
-  canvas.width   = cssW * dpr;
-  canvas.height  = cssH * dpr;
+  const dpr  = window.devicePixelRatio || 1;
+  // Use parent clientWidth so canvas is correctly sized even on first render
+  const cssW = (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || canvas.offsetWidth || 300;
+  const rowH = 30;
+  const padL = 60, padR = 36, padT = 8, padB = 8;
+  const cssH = bars.length * rowH + padT + padB;
+
+  canvas.width        = cssW * dpr;
+  canvas.height       = cssH * dpr;
   canvas.style.width  = cssW + 'px';
   canvas.style.height = cssH + 'px';
 
@@ -931,27 +938,31 @@ function drawBarsChart(n) {
   const barW = cssW - padL - padR;
 
   bars.forEach((b, i) => {
-    const y   = padT + i * rowH;
-    const pct = Math.min(b.val / b.ref, 1);
+    const y    = padT + i * rowH;
+    const pct  = Math.min(b.val / b.ref, 1);
+    const fillW = Math.max(barW * pct, 0);
     let color;
     if (!b.invert) color = pct < 0.5 ? '#3d6b4f' : pct < 0.8 ? '#a08c3a' : '#8f3030';
     else           color = pct > 0.5 ? '#3d6b4f' : pct > 0.2 ? '#a08c3a' : '#8f3030';
 
     // Track
     ctx.fillStyle = '#d8d3cc';
-    ctx.fillRect(padL, y + 8, barW, 10);
+    ctx.fillRect(padL, y + 10, barW, 9);
     // Fill
     ctx.fillStyle = color;
-    ctx.fillRect(padL, y + 8, barW * pct, 10);
-    // Label
-    ctx.fillStyle = '#6b6560';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText(b.label, padL - 4, y + 17);
-    // Pct text
-    ctx.fillStyle = '#1c1c1c';
-    ctx.textAlign = 'left';
-    ctx.fillText((pct * 100).toFixed(0) + '%', padL + barW * pct + 3, y + 17);
+    if (fillW > 0) ctx.fillRect(padL, y + 10, fillW, 9);
+
+    // Label left
+    ctx.fillStyle  = '#6b6560';
+    ctx.font       = '10px Arial';
+    ctx.textAlign  = 'right';
+    ctx.fillText(b.label, padL - 5, y + 19);
+
+    // Pct label — fixed at right edge, never overlaps bar
+    ctx.fillStyle  = '#1c1c1c';
+    ctx.font       = 'bold 10px Arial';
+    ctx.textAlign  = 'left';
+    ctx.fillText(Math.round(pct * 100) + '%', padL + barW + 4, y + 19);
   });
 }
 
