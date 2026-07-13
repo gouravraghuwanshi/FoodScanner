@@ -505,8 +505,6 @@ function analyseNutrients(product) {
     // ── Good things (high = good) ──
     { val: per(n['fiber_100g']),         label: 'Good source of fibre',   bad: 1.5, good: 3,   invert: true  },
     { val: per(n['proteins_100g']),      label: 'Good source of protein', bad: 2,   good: 5,   invert: true  },
-    // ── Additives / NOVA ──
-    { val: per(product.nova_group),      label: 'Ultra-processed (NOVA 4)', bad: 4, good: 2,   invert: false, integer: true },
   ];
 
   const good = [], bad = [], neutral = [];
@@ -523,6 +521,15 @@ function analyseNutrients(product) {
       else neutral.push(label);
     }
   });
+
+  // NOVA group — integer 1–4 scale, handled separately
+  const nova = per(product.nova_group);
+  if (nova !== null) {
+    if (nova === 1)      good.push('Minimally processed (NOVA 1)');
+    else if (nova === 2) good.push('Culinary ingredient (NOVA 2)');
+    else if (nova === 3) neutral.push('Processed food (NOVA 3)');
+    else if (nova === 4) bad.push('Ultra-processed (NOVA 4)');
+  }
 
   // Additives from OFF
   const additives = product.additives_tags || [];
